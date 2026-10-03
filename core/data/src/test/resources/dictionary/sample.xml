@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A few entries in Open English WordNet's form (WN-LMF), for the tests' dictionary. -->
+<LexicalResource>
+  <Lexicon id="oewn" label="Sample" language="en" email="" license="https://creativecommons.org/licenses/by/4.0" version="2025">
+    <LexicalEntry id="oewn-go-v">
+      <Lemma writtenForm="go" partOfSpeech="v">
+        <Pronunciation variety="GB">ɡəʊ</Pronunciation>
+        <Pronunciation variety="US">ɡoʊ</Pronunciation>
+      </Lemma>
+      <Form writtenForm="went"/>
+      <Sense id="s1" synset="oewn-1-v"/>
+    </LexicalEntry>
+    <LexicalEntry id="oewn-hammer-n">
+      <Lemma writtenForm="hammer" partOfSpeech="n">
+        <Pronunciation variety="GB">ˈhæ.mə(ɹ)</Pronunciation>
+        <Pronunciation variety="US">ˈhæ.mɚ</Pronunciation>
+      </Lemma>
+      <Sense id="s2" synset="oewn-2-n"/>
+    </LexicalEntry>
+    <LexicalEntry id="oewn-hammer-v">
+      <Lemma writtenForm="hammer" partOfSpeech="v"/>
+      <Sense id="s3" synset="oewn-3-v"/>
+      <Sense id="s4" synset="oewn-4-v"/>
+    </LexicalEntry>
+    <LexicalEntry id="oewn-hammered-s">
+      <Lemma writtenForm="hammered" partOfSpeech="s"/>
+      <Sense id="s5" synset="oewn-5-s"/>
+    </LexicalEntry>
+    <LexicalEntry id="oewn-March-n">
+      <Lemma writtenForm="March" partOfSpeech="n"/>
+      <Sense id="s6" synset="oewn-6-n"/>
+    </LexicalEntry>
+    <LexicalEntry id="oewn-march-n">
+      <Lemma writtenForm="march" partOfSpeech="n"/>
+      <Sense id="s7" synset="oewn-7-n"/>
+    </LexicalEntry>
+    <LexicalEntry id="oewn-rib_cage-n">
+      <Lemma writtenForm="rib cage" partOfSpeech="n"/>
+      <Sense id="s8" synset="oewn-8-n"/>
+    </LexicalEntry>
+    <LexicalEntry id="oewn-give-v">
+      <Lemma writtenForm="give" partOfSpeech="v"/>
+      <Form writtenForm="gave"/>
+      <Sense id="s9" synset="oewn-9-v"/>
+    </LexicalEntry>
+    <LexicalEntry id="oewn-give_up-v">
+      <Lemma writtenForm="give up" partOfSpeech="v"/>
+      <Sense id="s10" synset="oewn-10-v"/>
+    </LexicalEntry>
+    <LexicalEntry id="oewn-Abraham_Lincoln-n">
+      <Lemma writtenForm="Abraham Lincoln" partOfSpeech="n"/>
+      <Sense id="s11" synset="oewn-11-n"/>
+    </LexicalEntry>
+    <Synset id="oewn-1-v" partOfSpeech="v">
+      <Definition>move away from a place into another direction</Definition>
+      <Example>"Go away before I start to cry"</Example>
+    </Synset>
+    <Synset id="oewn-2-n" partOfSpeech="n">
+      <Definition>a hand tool with a heavy rigid head and a handle</Definition>
+    </Synset>
+    <Synset id="oewn-3-v" partOfSpeech="v">
+      <Definition>beat with or as if with a hammer</Definition>
+      <Example>hammer the metal flat</Example>
+    </Synset>
+    <Synset id="oewn-4-v" partOfSpeech="v">
+      <Definition>create by hammering</Definition>
+    </Synset>
+    <Synset id="oewn-5-s" partOfSpeech="s">
+      <Definition>shaped or worked with a hammer</Definition>
+    </Synset>
+    <Synset id="oewn-6-n" partOfSpeech="n">
+      <Definition>the month following February</Definition>
+    </Synset>
+    <Synset id="oewn-7-n" partOfSpeech="n">
+      <Definition>the act of marching</Definition>
+    </Synset>
+    <Synset id="oewn-8-n" partOfSpeech="n">
+      <Definition>the bony enclosure of the chest</Definition>
+    </Synset>
+    <Synset id="oewn-9-v" partOfSpeech="v">
+      <Definition>transfer possession of something to somebody</Definition>
+    </Synset>
+    <Synset id="oewn-10-v" partOfSpeech="v">
+      <Definition>stop maintaining or insisting on</Definition>
+      <Example>He gave up smoking</Example>
+    </Synset>
+    <Synset id="oewn-11-n" partOfSpeech="n">
+      <Definition>16th President of the United States</Definition>
+    </Synset>
+  </Lexicon>
+</LexicalResource>

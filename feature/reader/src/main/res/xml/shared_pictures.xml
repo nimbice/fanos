@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pictures sent to other apps from the reader (Share in the picture viewer, quote cards): a cache folder of their own. -->
+<paths>
+    <cache-path name="shared" path="shared/" />
+</paths>

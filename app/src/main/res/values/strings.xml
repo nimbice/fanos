@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Fanos</string>
+    <string name="widget_continue_reading">Continue reading</string>
+    <string name="widget_continue_reading_description">The novels you read last; tap one to go on reading</string>
+</resources>

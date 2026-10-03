@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Fanos installs its own updates: asking the first time, and after that without asking on Android 12+. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
+
+    <application>
+        <!-- The package installer's verdict on an update. -->
+        <receiver
+            android:name="io.github.nimbice.fanos.core.updater.InstallResultReceiver"
+            android:exported="false" />
+        <!-- The update notification's Install and Later. -->
+        <receiver
+            android:name="io.github.nimbice.fanos.core.updater.UpdateActionReceiver"
+            android:exported="false" />
+    </application>
+
+</manifest>

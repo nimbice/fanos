@@ -1,0 +1,17 @@
+.gradle/
+.kotlin/
+build/
+/third_party/
+/local.properties
+/keystore.properties
+*.jks
+*.keystore
+*.p12
+*.pk8
+signing.properties
+*.apk
+*.aab
+.idea/
+*.iml
+.DS_Store
+/captures

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  What leaves this device in a transfer to another (Android 12 and later; cloud backup is off, allowBackup=false).
+  The library, reading places, highlights and settings may go; secrets and code may not: the updater's key and the
+  trusted extension keys (datastore), site sign-ins (the WebView's cookies and storage), the extensions' code, and
+  the voice pack and caches, which are large and fetched again.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="datastore/" />
+        <exclude domain="root" path="app_webview/" />
+        <exclude domain="file" path="extensions/" />
+        <exclude domain="file" path="voices/" />
+        <exclude domain="root" path="cache/" />
+    </device-transfer>
+</data-extraction-rules>
