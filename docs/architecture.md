@@ -186,8 +186,9 @@ counts: downloading it only marks it saved.
 `core/updater`. Builds are releases of the private repository nimbice/fanos-builds: each has the
 APK and an update.json (versionCode, versionName, apk, size, sha256, notes). The app reads them
 through GitHub's API with a read-only fine-grained token that the reader pastes into Settings >
-Updates, once; it's kept on the phone only (not in the APK, not in backups). A check runs daily and
-when the app opens after an hour (`UpdateScheduler`, off with "Check for updates automatically"),
+Updates, once; it's kept on the phone only (not in the APK, not in backups). A check runs once a day:
+the daily worker's, or one as the app opens when the last is a day old (`UpdateScheduler`, off with "Check for
+updates automatically"),
 or when asked, and announces a build once. Nothing is fetched until the reader taps Install: the
 APK is downloaded, checked against its SHA-256, the package name, the version and the installed
 app's signing key, and handed to Android's package installer, which asks the first time and after

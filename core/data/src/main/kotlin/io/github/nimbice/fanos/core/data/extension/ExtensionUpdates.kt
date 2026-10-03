@@ -40,12 +40,12 @@ class ExtensionUpdates @Inject constructor(
 ) : BackgroundCheck {
     private val downloads = File(context.cacheDir, "extension-downloads")
 
-    /** The published extensions, public and (with a key) private. */
-    suspend fun published(): List<PublishedExtension> = catalog.published()
+    /** The published extensions, public and (with a key) private; [fresh] asks GitHub even when today's catalogue is kept. */
+    suspend fun published(fresh: Boolean = false): List<PublishedExtension> = catalog.published(if (fresh) 0 else ExtensionCatalog.DAY_MS)
 
-    /** The installed extensions' updates, as the reader looks (nothing announced). */
-    suspend fun look(): ExtensionLook {
-        val published = catalog.published()
+    /** The installed extensions' updates, as the reader looks (nothing announced); [fresh] as for [published]. */
+    suspend fun look(fresh: Boolean = false): ExtensionLook {
+        val published = published(fresh)
         val installed = extensions.extensions.first()
         return ExtensionLook(compare(installed, published).updates.map { it.name }, installed.size)
     }

@@ -398,7 +398,7 @@ private fun UpdateSettings(versionName: String, app: AppSettings, viewModel: Set
         // The extensions' updates, looked for with the app's (nothing to show without the key).
         if (extensions != ExtensionsLook.None) item { ExtensionUpdatesItem(extensions, onOpenExtensions) }
         item {
-            SwitchItem("Check for updates automatically", "Daily, and when Fanos opens", app.checkForUpdates) { on ->
+            SwitchItem("Check for updates automatically", "Once a day, app and extensions", app.checkForUpdates) { on ->
                 viewModel.updateApp { it.copy(checkForUpdates = on) }
             }
         }

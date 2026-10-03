@@ -203,6 +203,7 @@ class Updater @Inject constructor(
         const val INSTALL_WORK = "app-update-install"
 
         /** Opening the app looks again after this long. */
-        const val RECHECK_MS = 60 * 60 * 1000L
+        /** Checks come once a day: the daily worker's, or one on opening when the last is a day old. */
+        const val RECHECK_MS = 24 * 60 * 60 * 1000L
     }
 }

@@ -13,6 +13,8 @@ import java.io.File
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 
 /** A published extension, as index.json describes it. */
 data class PublishedExtension(
@@ -39,20 +41,46 @@ data class PublishedExtension(
  */
 @Singleton
 class ExtensionCatalog @Inject constructor(
+    @ApplicationContext context: Context,
     private val settings: SettingsDataSource,
     client: OkHttpClient,
     @Dispatcher(ReaderDispatchers.IO) private val io: CoroutineDispatcher,
 ) {
     private val releases = GitHubReleases(client, io)
 
-    /** The published extensions, public and (with a key) private; empty when nothing is published yet. */
-    suspend fun published(): List<PublishedExtension> {
+    /** What was last fetched, kept for [DAY_MS]: the screens listing extensions read this rather than asking GitHub each time. */
+    private val cache = File(context.cacheDir, "extension-catalogue.json")
+
+    /**
+     * The published extensions, public and (with a key) private; empty when nothing is published yet. Fetched afresh
+     * unless what was fetched within [maxAge] (with the same key or none) will do.
+     */
+    suspend fun published(maxAge: Long = 0): List<PublishedExtension> {
         val token = settings.updates.first().token
+        if (maxAge > 0) cached(maxAge, withKey = token != null)?.let { return it }
         return saying("Couldn't reach GitHub. Check your connection.") {
             val public = publicIndex()
             val private = if (token != null) privateIndex(token) else emptyList()
             // The public one first, so it's the one kept of two at the same version.
             (public + private).groupBy { it.id }.values.map { same -> same.maxBy { it.versionCode } }
+        }.also { remember(it, withKey = token != null) }
+    }
+
+    private suspend fun cached(maxAge: Long, withKey: Boolean): List<PublishedExtension>? =
+        withContext(io) {
+            runCatching {
+                if (!cache.isFile) return@withContext null
+                val kept = GitHubReleases.JSON.decodeFromString(Cached.serializer(), cache.readText())
+                if (kept.withKey != withKey || System.currentTimeMillis() - kept.at !in 0..maxAge) return@withContext null
+                kept.extensions.map { it.extension() }
+            }.getOrNull()
+        }
+
+    private suspend fun remember(extensions: List<PublishedExtension>, withKey: Boolean) {
+        withContext(io) {
+            runCatching {
+                cache.writeText(GitHubReleases.JSON.encodeToString(Cached.serializer(), Cached(System.currentTimeMillis(), withKey, extensions.map { CachedExtension(it) })))
+            }
         }
     }
 
@@ -97,6 +125,28 @@ class ExtensionCatalog @Inject constructor(
             throw UpdateException(message)
         }
 
+    /** The last fetch, as kept on disk. */
+    @Serializable
+    private class Cached(val at: Long, val withKey: Boolean, val extensions: List<CachedExtension>)
+
+    @Serializable
+    private class CachedExtension(
+        val id: String,
+        val name: String,
+        val versionCode: Long,
+        val versionName: String,
+        val apiLevel: Int,
+        val lang: String,
+        val size: Long,
+        val sha256: String,
+        val url: String,
+        val keyed: Boolean,
+    ) {
+        constructor(e: PublishedExtension) : this(e.id, e.name, e.versionCode, e.versionName, e.apiLevel, e.lang, e.size, e.sha256, e.url, e.keyed)
+
+        fun extension() = PublishedExtension(id, name, versionCode, versionName, apiLevel, lang, size, sha256, url, keyed)
+    }
+
     @Serializable
     private class Index(val extensions: List<Entry> = emptyList())
 
@@ -113,8 +163,11 @@ class ExtensionCatalog @Inject constructor(
         val sha256: String,
     )
 
-    private companion object {
-        const val TAG = "extensions"
-        const val INDEX = "index.json"
+    companion object {
+        private const val TAG = "extensions"
+        private const val INDEX = "index.json"
+
+        /** How long a fetched catalogue serves the screens: the daily check fetches afresh. */
+        const val DAY_MS = 24 * 60 * 60 * 1000L
     }
 }

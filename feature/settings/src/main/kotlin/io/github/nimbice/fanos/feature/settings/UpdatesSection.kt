@@ -74,22 +74,22 @@ class UpdatesViewModel @Inject constructor(private val updater: Updater, private
     val extensions: StateFlow<ExtensionsLook> = _extensions.asStateFlow()
 
     init {
-        // Opening the settings looks again when the last look was a while ago; the extensions are looked at each time.
+        // Opening the settings looks again only when the last check is a day old; the extensions show today's catalogue.
         viewModelScope.launch { if (updater.checkDue()) updater.check() }
-        lookAtExtensions()
+        lookAtExtensions(fresh = false)
     }
 
     fun check() {
         viewModelScope.launch { updater.check() }
-        lookAtExtensions()
+        lookAtExtensions(fresh = true)
     }
 
-    private fun lookAtExtensions() {
+    private fun lookAtExtensions(fresh: Boolean) {
         viewModelScope.launch {
             if (_extensions.value !is ExtensionsLook.Found) _extensions.value = ExtensionsLook.Looking
             _extensions.value =
                 try {
-                    extensionUpdates.look().let { ExtensionsLook.Found(it.updates, it.installed) }
+                    extensionUpdates.look(fresh).let { ExtensionsLook.Found(it.updates, it.installed) }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -105,7 +105,8 @@ class UpdatesViewModel @Inject constructor(private val updater: Updater, private
     fun setToken(token: String?) {
         viewModelScope.launch {
             updater.setToken(token)
-            lookAtExtensions()
+            // A new key (or none) changes which extensions there are to see: today's catalogue won't do.
+            lookAtExtensions(fresh = true)
         }
     }
 }
@@ -150,7 +151,8 @@ internal fun UpdatesItem(settingUp: Boolean, onSettingUp: (Boolean) -> Unit, mod
                 "Update available",
                 modifier,
                 summary = { Text("${update.update.versionName} · ${Formatter.formatShortFileSize(context, update.update.size)}") },
-                trailing = { Button(onClick = viewModel::install) { Text("Install") } },
+                // Check again: the channel may have changed under it (the key removed, test builds no longer followed).
+                trailing = { Row { TextButton(onClick = viewModel::check) { Text("Check again") }; Button(onClick = viewModel::install) { Text("Install") } } },
             )
         is UpdateState.Downloading ->
             SettingsItem(
