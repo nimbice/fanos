@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
+    <application>
+        <!-- Downloads, and expedited library updates before Android 12, run as a data-sync foreground service. -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
+
+        <!-- A new-chapter notification's Download. -->
+        <receiver
+            android:name="io.github.nimbice.fanos.core.data.notification.NewChapterActionReceiver"
+            android:exported="false" />
+
+        <!-- The download notification's Cancel. -->
+        <receiver
+            android:name="io.github.nimbice.fanos.core.data.notification.DownloadCancelReceiver"
+            android:exported="false" />
+    </application>
+</manifest>

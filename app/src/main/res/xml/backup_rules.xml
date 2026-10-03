@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Before Android 12, the same rule as data_extraction_rules.xml: no secrets, code or caches in any backup. -->
+<full-backup-content>
+    <exclude domain="file" path="datastore" />
+    <exclude domain="root" path="app_webview" />
+    <exclude domain="file" path="extensions" />
+    <exclude domain="file" path="voices" />
+</full-backup-content>

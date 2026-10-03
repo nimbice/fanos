@@ -1,0 +1,52 @@
+Fanos
+Copyright (C) 2026 nimbice
+
+This program is free software: you can redistribute it and/or modify it under the terms of the
+GNU General Public License as published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version. See LICENSE.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
+even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+General Public License for more details.
+
+Fanos is an independent project. It is not affiliated with or endorsed by any site it reads, nor by any
+other business or product called Fanos.
+
+This program includes code derived from:
+
+- NovelLibrary (https://github.com/gmathi/NovelLibrary), Copyright gmathi and contributors,
+  licensed under the Apache License, Version 2.0. Derived parts are in the chapter clean-up and
+  title detection (core/content). Files derived from it say so in a header comment and have been
+  modified.
+
+The Apache License, Version 2.0 is in THIRD_PARTY_NOTICES.md and at
+https://www.apache.org/licenses/LICENSE-2.0.
+
+This program bundles these fonts, unmodified, for the reader. They are licensed under the SIL Open
+Font License, Version 1.1, not under the GPL. Each font's copyright notice and a copy of the license
+are in feature/reader/src/main/assets/reader/fonts/licenses, and ship inside the app.
+
+- Literata, Copyright 2017 The Literata Project Authors
+- Lora, Copyright 2011 The Lora Project Authors, with Reserved Font Name "Lora"
+- Crimson Pro, Copyright 2018 The Crimson Pro Project Authors
+- EB Garamond, Copyright 2017 The EB Garamond Project Authors
+- Bitter, Copyright 2011 The Bitter Project Authors, with Reserved Font Name "Bitter Pro"
+- Atkinson Hyperlegible Next, Copyright 2020-2024 The Atkinson Hyperlegible Next Project Authors
+- Lexend, Copyright 2018 The Lexend Project Authors, with Reserved Font Name "RevReading Lexend"
+
+The SIL Open Font License, Version 1.1 is available at https://openfontlicense.org.
+
+This program bundles a dictionary made from Open English WordNet, 2025 edition
+(https://github.com/globalwordnet/english-wordnet), Copyright (c) 2019-present, The Open English
+WordNet Team, licensed under the Creative Commons Attribution 4.0 International License
+(https://creativecommons.org/licenses/by/4.0/), not under the GPL, and derived from Princeton
+WordNet (WordNet 3.1 Copyright 2011 by Princeton University, all rights reserved), whose notice and
+disclaimer are reproduced in THIRD_PARTY_NOTICES.md. It has been modified: words and phrases are
+kept with up to three senses for each part of speech, their pronunciations and irregular forms, in a
+format made by tools/dictionary/make_dictionary.py (core/data/src/main/assets/dictionary/oewn-2025.dict).
+
+This program ships the speech engine sherpa-onnx (Apache-2.0), which has ONNX Runtime (MIT),
+eSpeak NG (GPL-3.0-or-later), kaldifst, OpenFst, kaldi-decoder and simple-sentencepiece (Apache-2.0),
+piper-phonemize and cppjieba (MIT) built into it. The libraries it uses, their licences, and the
+services it shows words and pictures from are listed in THIRD_PARTY_NOTICES.md, which also ships
+inside the app (Settings > About > Third-party notices).

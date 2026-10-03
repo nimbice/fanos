@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Let's Encrypt's 2026 roots, Root YE and Root YR, besides the phone's own. A site whose certificate chains to them,
+    sent as the short chain ending there, can't be checked on a phone without them, and translators' sites with such
+    certificates wouldn't open. Both are the versions signed by ISRG Root X2 and X1, which phones already trust, so they
+    add no trust of their own: they only let the short chain be checked.
+-->
+<network-security-config>
+    <base-config>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="@raw/isrg_root_ye" />
+            <certificates src="@raw/isrg_root_yr" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
