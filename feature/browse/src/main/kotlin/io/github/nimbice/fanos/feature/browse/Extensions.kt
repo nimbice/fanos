@@ -116,8 +116,8 @@ class ExtensionsViewModel @Inject constructor(private val extensions: ExtensionM
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ExtensionsUiState())
 
     /**
-     * Looks for published extensions, unless they were found in the last minute ([again] looks
-     * regardless); what was found before stays shown meanwhile.
+     * Looks for published extensions: today's catalogue, or GitHub's when [again] (and when they were found in
+     * the last minute, not at all); what was found before stays shown meanwhile.
      */
     fun lookForPublished(again: Boolean = false) {
         if (looking?.isActive == true) return
@@ -126,7 +126,7 @@ class ExtensionsViewModel @Inject constructor(private val extensions: ExtensionM
             viewModelScope.launch {
                 if (published.value !is Published.Found) published.value = Published.Looking
                 published.value =
-                    suspendRunCatching { updates.published() }.fold(
+                    suspendRunCatching { updates.published(fresh = again) }.fold(
                         onSuccess = { found ->
                             foundAt = SystemClock.elapsedRealtime()
                             Published.Found(found)

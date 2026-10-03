@@ -24,8 +24,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Looks for new builds while "Check for updates automatically" is on: daily in the background, and as the
- * app opens when the last look was a while ago.
+ * Looks for new builds while "Check for updates automatically" is on: once a day, by the daily worker or as the
+ * app opens when the last look is a day old.
  */
 @Singleton
 class UpdateScheduler @Inject constructor(
