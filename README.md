@@ -38,7 +38,8 @@ Your library, reading places, highlights and notes stay on your device, and in t
 
 ## Installing and updates
 
-Builds are published as GitHub releases. Fanos checks for a newer build daily and when it opens
+Download `Fanos-<version>.apk` from the [releases](https://github.com/nimbice/fanos/releases) (arm64 devices, Android 8.0
+or later) and open it to install. From then on Fanos checks for a newer release daily and when it opens
 (Settings > Updates, where it can be turned off), tells you when there is one, and installs it only when you ask.
 A build is installed only if it was signed with the same key as the app you have.
 
