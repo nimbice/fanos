@@ -35,6 +35,8 @@ data class AvailableUpdate(
     val sha256: String,
     /** The APK's address in the repository's API. */
     internal val apkUrl: String,
+    /** A private build, read with the key; a public release needs none. */
+    internal val keyed: Boolean = false,
 )
 
 /** Where the updater is. */
@@ -80,6 +82,9 @@ class Updater @Inject constructor(
     /** Whether a key for private builds is set. */
     val hasKey: Flow<Boolean> = settings.updates.map { it.token != null }
 
+    /** Whether app updates follow the private test builds (which takes a key too) rather than the public releases. */
+    val followsTestBuilds: Flow<Boolean> = settings.updates.map { it.testBuilds }
+
     /** Shows what's known from the last check, as the app starts. */
     suspend fun restore() {
         val record = settings.updates.first()
@@ -95,16 +100,22 @@ class Updater @Inject constructor(
         return checkedAt == null || clock.now() - checkedAt !in 0..RECHECK_MS
     }
 
-    /** Sets the key builds are read with, and looks for one straight away; null forgets it. */
+    /** Sets the key private builds and extensions are read with, and looks for a build straight away; null forgets it. */
     suspend fun setToken(token: String?) {
         settings.setUpdatesToken(token?.trim()?.ifEmpty { null })
-        if (token.isNullOrBlank()) _state.value = UpdateState.NotSetUp else check()
+        check()
+    }
+
+    /** Follows the private test builds, or the public releases again, and looks straight away. */
+    suspend fun setFollowsTestBuilds(on: Boolean) {
+        settings.setUpdatesTestBuilds(on)
+        check()
     }
 
     /**
-     * Looks for a build newer than this one: among the public releases, or the private builds when a key is set. A
-     * background check ([quietly]) announces each build once, with a notification; one the reader asked for only
-     * shows its answer.
+     * Looks for a build newer than this one: among the public releases, or the private test builds when the reader
+     * follows them with a key. A background check ([quietly]) announces each build once, with a notification; one
+     * the reader asked for only shows its answer.
      */
     suspend fun check(quietly: Boolean = false): UpdateState {
         val record = settings.updates.first()
@@ -113,10 +124,11 @@ class Updater @Inject constructor(
         _state.value = UpdateState.Checking
         val result =
             try {
-                val latest = if (token != null) releases.latest(token) else releases.latestPublic()
+                val private = token != null && record.testBuilds
+                val latest = if (token != null && record.testBuilds) releases.latest(token) else releases.latestPublic()
                 settings.updatesChecked(clock.now())
                 when {
-                    latest == null && token == null -> UpdateState.NotSetUp
+                    latest == null && !private -> UpdateState.NotSetUp
                     latest != null && latest.versionCode > installedVersion() -> UpdateState.Available(latest)
                     else -> UpdateState.UpToDate(clock.now())
                 }
@@ -149,8 +161,8 @@ class Updater @Inject constructor(
     /** The install worker's job: the latest build, fetched, checked and handed to Android. */
     internal suspend fun downloadAndInstall(): Boolean =
         mutex.withLock {
-            val token = settings.updates.first().token
             val update = (check() as? UpdateState.Available)?.update ?: return false
+            val token = if (update.keyed) settings.updates.first().token else null
             val file = File(context.cacheDir, "updates/fanos-update.apk").apply { parentFile?.mkdirs() }
             try {
                 _state.value = UpdateState.Downloading(update, 0f)

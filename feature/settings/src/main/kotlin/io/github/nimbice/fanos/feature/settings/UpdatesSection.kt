@@ -58,8 +58,15 @@ sealed interface ExtensionsLook {
 class UpdatesViewModel @Inject constructor(private val updater: Updater, private val extensionUpdates: ExtensionUpdates) : ViewModel() {
     val state: StateFlow<UpdateState> = updater.state
 
-    /** Whether a key for private builds is set: the key dialog then offers to remove it. */
+    /** Whether a key for private builds is set: the key dialog then offers to remove it, and "Follow test builds" shows. */
     val hasKey: StateFlow<Boolean> = updater.hasKey.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    /** Whether app updates follow the private test builds rather than the public releases. */
+    val testBuilds: StateFlow<Boolean> = updater.followsTestBuilds.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    fun setTestBuilds(on: Boolean) {
+        viewModelScope.launch { updater.setFollowsTestBuilds(on) }
+    }
 
     private val _extensions = MutableStateFlow<ExtensionsLook>(ExtensionsLook.None)
 
@@ -113,6 +120,7 @@ internal fun UpdatesItem(settingUp: Boolean, onSettingUp: (Boolean) -> Unit, mod
     val context = LocalContext.current
     val state by viewModel.state.collectAsStateWithLifecycle()
     val hasKey by viewModel.hasKey.collectAsStateWithLifecycle()
+    val testBuilds by viewModel.testBuilds.collectAsStateWithLifecycle()
     when (val update = state) {
         UpdateState.NotSetUp ->
             SettingsItem(
@@ -126,7 +134,8 @@ internal fun UpdatesItem(settingUp: Boolean, onSettingUp: (Boolean) -> Unit, mod
                 "Up to date",
                 modifier,
                 summary = {
-                    Text(update.checkedAt?.let { "Checked ${ago(context, it)}" } ?: "Not checked yet")
+                    val checked = update.checkedAt?.let { "Checked ${ago(context, it)}" } ?: "Not checked yet"
+                    Text(if (testBuilds && hasKey) "$checked · test builds" else checked)
                 },
                 trailing = { OutlinedButton(onClick = viewModel::check) { Text("Check now") } },
             )
@@ -213,7 +222,7 @@ private fun KeyDialog(hasKey: Boolean, onSave: (String?) -> Unit, onDismiss: () 
         text = {
             Column {
                 Text(
-                    "A GitHub token that can read nimbice/fanos-builds and nothing else. It stays on this device and isn't backed up.",
+                    "A GitHub token that can read nimbice/fanos-builds and nothing else: it unlocks the private extensions, and the test builds if you follow them. It stays on this device and isn't backed up.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 OutlinedTextField(

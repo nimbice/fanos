@@ -91,7 +91,7 @@ internal class GitHubReleases(
         val text = text(manifestUrl, token)
         val manifest = runCatching { JSON.decodeFromString(Manifest.serializer(), text) }.getOrElse { throw UpdateException("The latest build's $MANIFEST can't be read.") }
         val apk = release.assets[manifest.apk] ?: throw UpdateException("The latest build's APK is missing.")
-        return AvailableUpdate(manifest.versionCode, manifest.versionName, manifest.notes, manifest.size, manifest.sha256, apk)
+        return AvailableUpdate(manifest.versionCode, manifest.versionName, manifest.notes, manifest.size, manifest.sha256, apk, keyed = true)
     }
 
     /**
