@@ -3,6 +3,10 @@
 What changed in each release of Fanos, newest first. The newest is always on the
 [releases page](https://github.com/nimbice/fanos/releases/latest).
 
+## 0.1.1 (2026-10-03)
+
+- Settings › Updates and Browse › Extensions are tidier, with fewer buttons and sections.
+
 ## 0.1.0 (2026-10-03)
 
 - The first public release.
