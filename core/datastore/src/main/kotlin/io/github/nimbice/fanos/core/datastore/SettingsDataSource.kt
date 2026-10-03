@@ -90,11 +90,15 @@ class SettingsDataSource @Inject constructor(private val store: DataStore<Prefer
     /** The key the app's updater reads builds with, and how its checks have gone. This phone's own, never backed up. */
     val updates: Flow<UpdatesRecord> =
         preferences.map {
-            UpdatesRecord(it[Keys.UPDATES_TOKEN], it[Keys.UPDATES_CHECKED_AT], it[Keys.UPDATES_NOTIFIED_VERSION], it[Keys.UPDATES_NOTIFIED_EXTENSIONS])
+            UpdatesRecord(it[Keys.UPDATES_TOKEN], it[Keys.UPDATES_CHECKED_AT], it[Keys.UPDATES_NOTIFIED_VERSION], it[Keys.UPDATES_NOTIFIED_EXTENSIONS], it[Keys.UPDATES_TEST_BUILDS] ?: false)
         }
 
     suspend fun setUpdatesToken(token: String?) {
         store.edit { prefs -> if (token == null) prefs.remove(Keys.UPDATES_TOKEN) else prefs[Keys.UPDATES_TOKEN] = token }
+    }
+
+    suspend fun setUpdatesTestBuilds(on: Boolean) {
+        store.edit { prefs -> prefs[Keys.UPDATES_TEST_BUILDS] = on }
     }
 
     suspend fun updatesChecked(at: Long) {
@@ -444,6 +448,7 @@ class SettingsDataSource @Inject constructor(private val store: DataStore<Prefer
         val UPDATES_CHECKED_AT = longPreferencesKey("updates_checked_at")
         val UPDATES_NOTIFIED_VERSION = longPreferencesKey("updates_notified_version")
         val UPDATES_NOTIFIED_EXTENSIONS = stringPreferencesKey("updates_notified_extensions")
+        val UPDATES_TEST_BUILDS = booleanPreferencesKey("updates_test_builds")
 
         // What was searched for lately stays on this phone as well.
         val SEARCH_HISTORY = stringPreferencesKey("search_history")
@@ -527,6 +532,7 @@ data class ReadingListRecord(val syncedAt: Long?, val novels: Int, val problem: 
 
 /**
  * The updater's key (null until the reader sets one), when it last checked, the build it last announced,
- * and the extension updates it last announced.
+ * the extension updates it last announced, and whether app updates follow the private test builds (with a
+ * key) rather than the public releases.
  */
-data class UpdatesRecord(val token: String?, val checkedAt: Long?, val notifiedVersion: Long?, val notifiedExtensions: String? = null)
+data class UpdatesRecord(val token: String?, val checkedAt: Long?, val notifiedVersion: Long?, val notifiedExtensions: String? = null, val testBuilds: Boolean = false)

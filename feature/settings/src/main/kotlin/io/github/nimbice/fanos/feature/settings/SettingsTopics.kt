@@ -383,10 +383,18 @@ private val DOWNLOAD_AHEAD_CHOICES = listOf(0, 2, 5, 10)
 private fun UpdateSettings(versionName: String, app: AppSettings, viewModel: SettingsViewModel, onOpenExtensions: () -> Unit) {
     val updates: UpdatesViewModel = hiltViewModel()
     val extensions by updates.extensions.collectAsStateWithLifecycle()
+    val hasKey by updates.hasKey.collectAsStateWithLifecycle()
+    val testBuilds by updates.testBuilds.collectAsStateWithLifecycle()
     var settingUpKey by rememberSaveable { mutableStateOf(false) }
     SettingsGroup {
         item { SettingsItem("Version", Modifier.combinedClickable(onLongClick = { settingUpKey = true }) {}, summary = { Text(versionName) }) }
         item { UpdatesItem(settingUp = settingUpKey, onSettingUp = { settingUpKey = it }, viewModel = updates) }
+        // With a key, the reader may follow the private test builds instead of the public releases.
+        if (hasKey) {
+            item {
+                SwitchItem("Follow test builds", "Private builds from fanos-builds instead of the public releases", testBuilds) { on -> updates.setTestBuilds(on) }
+            }
+        }
         // The extensions' updates, looked for with the app's (nothing to show without the key).
         if (extensions != ExtensionsLook.None) item { ExtensionUpdatesItem(extensions, onOpenExtensions) }
         item {
