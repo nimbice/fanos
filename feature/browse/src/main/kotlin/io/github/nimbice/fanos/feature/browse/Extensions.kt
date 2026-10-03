@@ -339,10 +339,13 @@ internal fun ExtensionsTab(
                 AvailableRow(extension, enabled = !state.working, onInstall = { onInstallPublished(listOf(extension)) })
             }
         }
-        // Whose extensions may run: the app's own key, and the keys the reader trusted, each forgettable.
-        item(key = "keys") { SectionHeader("Trusted keys") }
-        item(key = "key:own") { KeyRow("Fanos's own key, built in", onForget = null) }
-        items(state.trustedKeys.sorted(), key = { "key:$it" }) { signer -> KeyRow(fingerprint(signer), onForget = { onForgetKey(signer) }) }
+        // Whose extensions may run: the keys the reader trusted, each forgettable, with the app's own key named beside
+        // them. With none trusted there's nothing to manage, so nothing shows.
+        if (state.trustedKeys.isNotEmpty()) {
+            item(key = "keys") { SectionHeader("Trusted keys") }
+            item(key = "key:own") { KeyRow("Fanos's own key, built in", onForget = null) }
+            items(state.trustedKeys.sorted(), key = { "key:$it" }) { signer -> KeyRow(fingerprint(signer), onForget = { onForgetKey(signer) }) }
+        }
     }
 }
 

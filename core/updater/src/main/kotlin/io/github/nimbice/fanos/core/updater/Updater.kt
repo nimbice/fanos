@@ -23,6 +23,8 @@ import java.io.File
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 /** A build of the app on offer, as its update.json describes it. */
 data class AvailableUpdate(
@@ -74,6 +76,9 @@ class Updater @Inject constructor(
     private val mutex = Mutex()
     private val _state = MutableStateFlow<UpdateState>(UpdateState.UpToDate(null))
     val state: StateFlow<UpdateState> = _state.asStateFlow()
+
+    /** Whether a key for private builds is set. */
+    val hasKey: Flow<Boolean> = settings.updates.map { it.token != null }
 
     /** Shows what's known from the last check, as the app starts. */
     suspend fun restore() {
