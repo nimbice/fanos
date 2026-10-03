@@ -62,6 +62,8 @@ import android.widget.Toast
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.TextButton
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.runtime.saveable.rememberSaveable
 
 /** What Settings is divided into, each topic on a page of its own. */
 enum class SettingsTopic(val title: String) {
@@ -373,14 +375,18 @@ private fun DownloadSettings(app: AppSettings, viewModel: SettingsViewModel, onO
 /** The chapters "Download ahead while reading" offers; 0 is off. */
 private val DOWNLOAD_AHEAD_CHOICES = listOf(0, 2, 5, 10)
 
-/** This build, whether there's a newer one (and the key the builds are read with), and whether to look by itself. */
+/**
+ * This build, whether there's a newer one, and whether to look by itself. A long press on the Version row opens the
+ * dialog for the key private builds are read with: the public sees no key anywhere.
+ */
 @Composable
 private fun UpdateSettings(versionName: String, app: AppSettings, viewModel: SettingsViewModel, onOpenExtensions: () -> Unit) {
     val updates: UpdatesViewModel = hiltViewModel()
     val extensions by updates.extensions.collectAsStateWithLifecycle()
+    var settingUpKey by rememberSaveable { mutableStateOf(false) }
     SettingsGroup {
-        item { SettingsItem("Version", summary = { Text(versionName) }) }
-        item { UpdatesItem(viewModel = updates) }
+        item { SettingsItem("Version", Modifier.combinedClickable(onLongClick = { settingUpKey = true }) {}, summary = { Text(versionName) }) }
+        item { UpdatesItem(settingUp = settingUpKey, onSettingUp = { settingUpKey = it }, viewModel = updates) }
         // The extensions' updates, looked for with the app's (nothing to show without the key).
         if (extensions != ExtensionsLook.None) item { ExtensionUpdatesItem(extensions, onOpenExtensions) }
         item {

@@ -40,6 +40,8 @@ import io.github.nimbice.fanos.core.data.extension.ExtensionUpdates
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 
 /** What a look for extension updates found, from Settings: nothing to show (no key), looking, what it found, or that it couldn't. */
 sealed interface ExtensionsLook {
@@ -55,6 +57,9 @@ sealed interface ExtensionsLook {
 @HiltViewModel
 class UpdatesViewModel @Inject constructor(private val updater: Updater, private val extensionUpdates: ExtensionUpdates) : ViewModel() {
     val state: StateFlow<UpdateState> = updater.state
+
+    /** Whether a key for private builds is set: the key dialog then offers to remove it. */
+    val hasKey: StateFlow<Boolean> = updater.hasKey.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     private val _extensions = MutableStateFlow<ExtensionsLook>(ExtensionsLook.None)
 
@@ -99,22 +104,22 @@ class UpdatesViewModel @Inject constructor(private val updater: Updater, private
 }
 
 /**
- * The app's updates: whether there's a newer build and installing it, and the key the builds are read
- * with. What the updater is doing shows as it happens.
+ * The app's updates: whether there's a newer build and installing it. What the updater is doing shows as it
+ * happens. The key private builds are read with has no button of its own: the Version row opens its dialog on a
+ * long press ([settingUp]), so nothing asks a public reader for a key.
  */
 @Composable
-internal fun UpdatesItem(modifier: Modifier = Modifier, viewModel: UpdatesViewModel = hiltViewModel()) {
+internal fun UpdatesItem(settingUp: Boolean, onSettingUp: (Boolean) -> Unit, modifier: Modifier = Modifier, viewModel: UpdatesViewModel = hiltViewModel()) {
     val context = LocalContext.current
     val state by viewModel.state.collectAsStateWithLifecycle()
-    var settingUp by rememberSaveable { mutableStateOf(false) }
-    val keyButton = @Composable { TextButton(onClick = { settingUp = true }) { Text("Key") } }
+    val hasKey by viewModel.hasKey.collectAsStateWithLifecycle()
     when (val update = state) {
         UpdateState.NotSetUp ->
             SettingsItem(
                 "No build published yet",
                 modifier,
-                summary = { Text("Fanos looks for public builds on GitHub. A key is needed only for private builds.") },
-                trailing = { Row { keyButton(); OutlinedButton(onClick = viewModel::check) { Text("Check now") } } },
+                summary = { Text("Fanos looks for public builds on GitHub.") },
+                trailing = { OutlinedButton(onClick = viewModel::check) { Text("Check now") } },
             )
         is UpdateState.UpToDate ->
             SettingsItem(
@@ -123,7 +128,7 @@ internal fun UpdatesItem(modifier: Modifier = Modifier, viewModel: UpdatesViewMo
                 summary = {
                     Text(update.checkedAt?.let { "Checked ${ago(context, it)}" } ?: "Not checked yet")
                 },
-                trailing = { Row { keyButton(); OutlinedButton(onClick = viewModel::check) { Text("Check now") } } },
+                trailing = { OutlinedButton(onClick = viewModel::check) { Text("Check now") } },
             )
         UpdateState.Checking ->
             SettingsItem(
@@ -156,17 +161,17 @@ internal fun UpdatesItem(modifier: Modifier = Modifier, viewModel: UpdatesViewMo
                 "Update problem",
                 modifier,
                 summary = { Text(update.message) },
-                trailing = { Row { keyButton(); OutlinedButton(onClick = viewModel::check) { Text("Try again") } } },
+                trailing = { OutlinedButton(onClick = viewModel::check) { Text("Try again") } },
             )
     }
     if (settingUp) {
         KeyDialog(
-            hasKey = state != UpdateState.NotSetUp,
+            hasKey = hasKey,
             onSave = { key ->
                 viewModel.setToken(key)
-                settingUp = false
+                onSettingUp(false)
             },
-            onDismiss = { settingUp = false },
+            onDismiss = { onSettingUp(false) },
         )
     }
 }
