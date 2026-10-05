@@ -1,0 +1,22 @@
+Fanos is a reader for web novels.
+
+<b>Your library</b>
+• Novels from the sites you read, checked for new chapters in the background, with a notification when some arrive
+• Sections, filters and search, and a calendar of when each novel usually updates
+• Chapters downloaded for reading offline
+
+<b>The reader</b>
+• Turn pages or scroll; themes, fonts (or your own) and text size
+• A built-in dictionary, highlights, notes, bookmarks and quote cards to share
+• Footnotes as pop-ups, pictures full screen, a clock and battery at the foot of the page
+
+<b>Listening</b>
+• Chapters read aloud with your phone's voices, or with natural voices that work offline
+
+<b>Sites come as extensions</b>
+Fanos comes with no sources. Browse › Extensions lists the published ones (Royal Road, Scribble Hub, Novel Updates and Patreon): install the ones you read.
+
+<b>Private by design</b>
+No account, no ads, no tracking. Your library stays on your phone and in your own backups.
+
+Fanos is free software under the GNU GPL, version 3 or later. It is an independent project, not affiliated with any site.

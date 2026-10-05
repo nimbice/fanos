@@ -7,6 +7,9 @@
   Tap the button, then open the downloaded file to install it. Your browser may ask you to allow installing apps first.<br>
   <a href="https://github.com/nimbice/fanos/releases">All releases</a> · <a href="CHANGELOG.md">What's new</a>
 </p>
+<p align="center">
+  <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/nimbice/fanos"><img src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png" alt="Get it on Obtainium" height="48"></a>
+</p>
 <!-- download:end -->
 
 # Fanos
@@ -17,6 +20,14 @@ reading, a reader with scroll and page modes, listening with the device's voices
 built-in dictionary, highlights, notes and reading stats. A ground-up rebuild of
 [NovelLibrary](https://github.com/gmathi/NovelLibrary) that takes the great work done on the original project and
 combines it with a more modern interface.
+
+<p align="center">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/1.png" alt="The library" width="23%">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/3.png" alt="Reading a chapter" width="23%">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/5.png" alt="Listening" width="23%">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/7.png" alt="The dictionary" width="23%">
+</p>
+<p align="center"><sub>The books shown are made up for these pictures.</sub></p>
 
 Fanos comes with no sources. Each site is an extension, built in [a repository of its own](https://github.com/nimbice/fanos-extensions).
 Browse > Extensions lists the published ones (Royal Road, Scribble Hub, Novel Updates and Patreon) and installs
