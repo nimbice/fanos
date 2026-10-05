@@ -1,9 +1,9 @@
 <!-- download:start (release.sh rewrites this block with each public release) -->
 <p align="center">
-  <a href="https://github.com/nimbice/fanos/releases/download/v0.1.4/Fanos-0.1.4.apk"><img src="docs/download-button.png" alt="Download Fanos 0.1.4 for Android" width="460"></a>
+  <a href="https://github.com/nimbice/fanos/releases/download/v0.1.5/Fanos-0.1.5.apk"><img src="docs/download-button.png" alt="Download Fanos 0.1.5 for Android" width="460"></a>
 </p>
 <p align="center">
-  <b>Fanos 0.1.4</b> · 23 MB · Android 8.0 or later (64-bit)<br>
+  <b>Fanos 0.1.5</b> · 23 MB · Android 8.0 or later (64-bit)<br>
   Tap the button, then open the downloaded file to install it. Your browser may ask you to allow installing apps first.<br>
   <a href="https://github.com/nimbice/fanos/releases">All releases</a> · <a href="CHANGELOG.md">What's new</a>
 </p>
