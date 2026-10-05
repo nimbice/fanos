@@ -3,6 +3,11 @@
 What changed in each release of Fanos, newest first. The newest is always on the
 [releases page](https://github.com/nimbice/fanos/releases/latest).
 
+## 0.1.5 (2026-10-05)
+
+- The icon at the end of the reader's brightness slider is now a button that hands brightness back to your phone, automatic brightness included. It's lit while your phone's own brightness is in use.
+- Reading settings use the same button in place of the "This device's own" chip.
+
 ## 0.1.4 (2026-10-05)
 
 - While the library checks for new chapters, the novels still to check are greyed out, and each turns back to colour once it's checked.

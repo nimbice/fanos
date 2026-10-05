@@ -1,0 +1,2 @@
+• The icon at the end of the reader's brightness slider is now a button that hands brightness back to your phone, automatic brightness included. It's lit while your phone's own brightness is in use.
+• Reading settings use the same button in place of the "This device's own" chip.
