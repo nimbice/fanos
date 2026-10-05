@@ -59,6 +59,7 @@ internal fun LibraryNovelRow.toModel() =
         sectionIds?.split(',')?.mapNotNull { it.trim().toLongOrNull() }?.toSet()?.ifEmpty { null } ?: setOf(LibrarySection.DEFAULT_ID),
         savedChapters = savedCount,
         latestChapterAt = latestChapterAt,
+        updateError = novel.updateError,
     )
 
 internal fun NovelsPage.toCatalogPage(sourceId: String) =

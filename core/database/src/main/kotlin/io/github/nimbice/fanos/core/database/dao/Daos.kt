@@ -138,6 +138,10 @@ interface NovelDao {
     @Query("UPDATE novels SET chapters_fetched_at = :time WHERE id = :id")
     suspend fun setChaptersFetchedAt(id: Long, time: Long)
 
+    /** Why the library update couldn't check the novel; null once it could. */
+    @Query("UPDATE novels SET update_error = :error WHERE id = :id")
+    suspend fun setUpdateError(id: Long, error: String?)
+
     /** The reader's own title and cover; null for either shows the site's. */
     @Query("UPDATE novels SET custom_title = :title, custom_cover_url = :coverUrl WHERE id = :id")
     suspend fun setEdits(id: Long, title: String?, coverUrl: String?)

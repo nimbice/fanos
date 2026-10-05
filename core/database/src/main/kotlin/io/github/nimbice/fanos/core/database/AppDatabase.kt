@@ -74,7 +74,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun highlightDao(): HighlightDao
 
     companion object {
-        const val VERSION = 16
+        const val VERSION = 17
         const val NAME = "library.db"
     }
 }

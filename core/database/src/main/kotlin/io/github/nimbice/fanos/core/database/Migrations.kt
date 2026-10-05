@@ -7,7 +7,7 @@ import androidx.sqlite.execSQL
 import io.github.nimbice.fanos.core.database.entity.SectionEntity
 
 /** Every schema change, oldest first. Libraries are never dropped to get past a version. */
-internal val MIGRATIONS = arrayOf(Migration1To2, Migration2To3, Migration3To4, Migration4To5, Migration5To6, Migration6To7, Migration7To8, Migration8To9, Migration9To10, Migration10To11, Migration11To12, Migration12To13, Migration13To14, Migration14To15, Migration15To16)
+internal val MIGRATIONS = arrayOf(Migration1To2, Migration2To3, Migration3To4, Migration4To5, Migration5To6, Migration6To7, Migration7To8, Migration8To9, Migration9To10, Migration10To11, Migration11To12, Migration12To13, Migration13To14, Migration14To15, Migration15To16, Migration16To17)
 
 /**
  * 2: novels keep a library position, the order the reader arranges the library in. The library
@@ -128,6 +128,13 @@ internal object Migration9To10 : Migration(9, 10) {
 internal object Migration10To11 : Migration(10, 11) {
     override fun migrate(connection: SQLiteConnection) {
         connection.execSQL("ALTER TABLE novels ADD COLUMN chapters_newest_first INTEGER")
+    }
+}
+
+/** 17: why the last library update couldn't check a novel, shown beside it in the library; none yet. */
+internal object Migration16To17 : Migration(16, 17) {
+    override fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE novels ADD COLUMN update_error TEXT")
     }
 }
 

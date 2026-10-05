@@ -37,20 +37,8 @@ class LibraryUpdateWorker @AssistedInject constructor(
     override suspend fun doWork(): Result {
         val found = mutableListOf<NovelUpdate>()
         try {
-            val result =
-                library.update(
-                    onProgress = { progress ->
-                        setProgress(
-                            workDataOf(
-                                KEY_DONE to progress.done,
-                                KEY_TOTAL to progress.total,
-                                KEY_CHECKING to progress.checking.map { it.title }.toTypedArray(),
-                                KEY_CHECKING_SINCE to progress.checking.map { it.startedAt }.toLongArray(),
-                            ),
-                        )
-                    },
-                    onFound = { found += it },
-                )
+            // How it's going is the repository's to tell (LibraryRepository.progress): novel by novel, more than work data holds.
+            val result = library.update(onFound = { found += it })
             return Result.success(workDataOf(KEY_NEW_CHAPTERS to result.newChapters, KEY_FAILED to result.failures.size))
         } finally {
             // Also when Android stops the check part way (the connection went, say): the chapters found
@@ -84,10 +72,6 @@ class LibraryUpdateWorker @AssistedInject constructor(
     companion object {
         /** Input: post a notification about the new chapters found. */
         const val KEY_NOTIFY = "notify"
-        const val KEY_DONE = "done"
-        const val KEY_TOTAL = "total"
-        const val KEY_CHECKING = "checking"
-        const val KEY_CHECKING_SINCE = "checking_since"
         const val KEY_NEW_CHAPTERS = "new_chapters"
         const val KEY_FAILED = "failed"
         private const val CHANNEL = "library_updates"

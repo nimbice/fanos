@@ -156,6 +156,8 @@ class NovelRepository @Inject constructor(
             plan.removals.chunked(CHUNK).forEach { chapters.markRemoved(it, now) }
             plan.restored.chunked(CHUNK).forEach { contents.delete(it) }
             novels.setChaptersFetchedAt(novelId, now)
+            // Fetched cleanly, from the library update or the novel's page: what an update failed with before is past.
+            novels.setUpdateError(novelId, null)
             novels.dropMissingChapterGroup(novelId)
             // A site whose groups are versions of the same chapters: the default one is followed until the reader picks.
             if (source.chapterGroupsAreVersions) novels.followDefaultChapterGroup(novelId, preferredVersion(list.map { Upload(it.title, it.group, it.publishedAt) }))

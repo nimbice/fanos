@@ -51,6 +51,8 @@ data class NovelEntity(
     @ColumnInfo(name = "chapter_group_chosen", defaultValue = "0") val chapterGroupChosen: Boolean = false,
     /** The novel's own chapter order, newest first or not; null while it follows the app's. */
     @ColumnInfo(name = "chapters_newest_first") val chaptersNewestFirst: Boolean? = null,
+    /** Why the last library update couldn't check it, for the library to show; cleared once its chapters are fetched. */
+    @ColumnInfo(name = "update_error") val updateError: String? = null,
 )
 
 @Entity(

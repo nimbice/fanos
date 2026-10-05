@@ -1,5 +1,6 @@
 package io.github.nimbice.fanos.feature.library
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
@@ -45,6 +47,7 @@ import androidx.compose.material3.TriStateCheckbox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,13 +55,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.toRect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.state.ToggleableState
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -74,12 +83,12 @@ import io.github.nimbice.fanos.core.model.LibraryNovel
 import io.github.nimbice.fanos.core.model.LibrarySection
 import io.github.nimbice.fanos.core.model.LibrarySort
 import io.github.nimbice.fanos.core.designsystem.component.FittingText
+import kotlinx.coroutines.delay
 
-/** The library's header: the unread count (or the novel an update waits on), and its buttons. */
+/** The library's header: the unread count, and its buttons. */
 @Composable
 internal fun LibraryHeader(
     text: String,
-    highlighted: Boolean,
     filtered: Boolean,
     onSearch: () -> Unit,
     onFilter: () -> Unit,
@@ -95,7 +104,7 @@ internal fun LibraryHeader(
         Text(
             text,
             style = MaterialTheme.typography.labelLarge,
-            color = if (highlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
@@ -346,8 +355,23 @@ internal fun DownloadDialog(novels: Int, count: suspend () -> Int, waitsForWifi:
     )
 }
 
+/**
+ * A novel in the grid. While an update has yet to finish checking it ([waiting]) it's greyed out, and once its check
+ * ([checkingSince]) is holding the update up, says so over the cover in red. Why the last update couldn't check it
+ * stays under it, in red, until a check goes through.
+ */
 @Composable
-internal fun LibraryItem(item: LibraryNovel, dragging: Boolean, selected: Boolean, onClick: () -> Unit, onLongClick: (() -> Unit)?) {
+internal fun LibraryItem(
+    item: LibraryNovel,
+    waiting: Boolean,
+    checkingSince: Long?,
+    dragging: Boolean,
+    selected: Boolean,
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)?,
+) {
+    val grey by animateFloatAsState(if (waiting) 1f else 0f, label = "waiting")
+    val slow = slowSeconds(checkingSince)
     Surface(
         shape = RoundedCornerShape(8.dp),
         color = if (dragging) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
@@ -355,37 +379,57 @@ internal fun LibraryItem(item: LibraryNovel, dragging: Boolean, selected: Boolea
     ) {
         Column(Modifier.pressable(onClick, onLongClick).padding(6.dp)) {
             Box {
-                NovelCover(item.novel.coverUrl, item.novel.title, Modifier.fillMaxWidth())
-                if (selected) {
-                    Box(
-                        Modifier
-                            .matchParentSize()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color.Black.copy(alpha = 0.45f))
-                            .border(3.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp)),
-                    )
-                    SelectedMark(Modifier.align(Alignment.TopStart).padding(6.dp))
+                Box(Modifier.greyed(grey)) {
+                    NovelCover(item.novel.coverUrl, item.novel.title, Modifier.fillMaxWidth())
+                    if (selected) {
+                        Box(
+                            Modifier
+                                .matchParentSize()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color.Black.copy(alpha = 0.45f))
+                                .border(3.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp)),
+                        )
+                        SelectedMark(Modifier.align(Alignment.TopStart).padding(6.dp))
+                    }
+                    if (item.unreadCount > 0) {
+                        Badge(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.align(Alignment.TopEnd).padding(6.dp),
+                        ) { Text(item.unreadCount.toString()) }
+                    }
                 }
-                if (item.unreadCount > 0) {
-                    Badge(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.align(Alignment.TopEnd).padding(6.dp),
-                    ) { Text(item.unreadCount.toString()) }
-                }
+                // Over the greyed cover, not greyed with it.
+                if (slow != null) SlowMark(slow, Modifier.align(Alignment.Center).padding(4.dp))
             }
             Text(
                 item.novel.title,
                 style = MaterialTheme.typography.labelLarge,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 6.dp),
+                modifier = Modifier.padding(top = 6.dp).greyed(grey),
             )
+            item.updateError?.let { UpdateError(it, Modifier.padding(top = 4.dp).fillMaxWidth().greyed(grey)) }
         }
     }
 }
 
+/**
+ * A novel in the list, greyed out while an update has yet to finish checking it ([waiting]). At its right, in red: how
+ * long its check ([checkingSince]) has taken once that holds the update up, else why the last update couldn't check it.
+ */
 @Composable
-internal fun LibraryRow(item: LibraryNovel, sourceName: String?, dragging: Boolean, selected: Boolean, onClick: () -> Unit, onLongClick: (() -> Unit)?) {
+internal fun LibraryRow(
+    item: LibraryNovel,
+    sourceName: String?,
+    waiting: Boolean,
+    checkingSince: Long?,
+    dragging: Boolean,
+    selected: Boolean,
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)?,
+) {
+    val grey by animateFloatAsState(if (waiting) 1f else 0f, label = "waiting")
+    val slow = slowSeconds(checkingSince)
     Surface(
         shape = RectangleShape,
         color =
@@ -401,11 +445,11 @@ internal fun LibraryRow(item: LibraryNovel, sourceName: String?, dragging: Boole
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box {
+            Box(Modifier.greyed(grey)) {
                 NovelCover(item.novel.coverUrl, item.novel.title, Modifier.width(48.dp))
                 if (selected) SelectedMark(Modifier.align(Alignment.Center))
             }
-            Column(Modifier.weight(1f)) {
+            Column(Modifier.weight(1f).greyed(grey)) {
                 Text(item.novel.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text(
                     listOfNotNull(item.novel.author, sourceName).joinToString(" · "),
@@ -420,12 +464,95 @@ internal fun LibraryRow(item: LibraryNovel, sourceName: String?, dragging: Boole
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            if (slow != null) {
+                SlowMark(slow)
+            } else {
+                item.updateError?.let { UpdateError(it, Modifier.widthIn(max = 120.dp).greyed(grey)) }
+            }
             if (item.unreadCount > 0) {
-                Badge(containerColor = MaterialTheme.colorScheme.primary) { Text(item.unreadCount.toString()) }
+                Badge(containerColor = MaterialTheme.colorScheme.primary, modifier = Modifier.greyed(grey)) { Text(item.unreadCount.toString()) }
             }
         }
     }
 }
+
+/**
+ * How long the check started at [since] has taken, in seconds, once that's long enough to be holding the update up;
+ * otherwise null. Counts up each second.
+ */
+@Composable
+private fun slowSeconds(since: Long?): Long? {
+    if (since == null) return null
+    var now by remember(since) { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(since) {
+        while (true) {
+            delay(1_000)
+            now = System.currentTimeMillis()
+        }
+    }
+    return if (now - since >= SLOW_CHECK_MS) (now - since) / 1_000 else null
+}
+
+private const val SLOW_CHECK_MS = 10_000L
+
+/** A check holding the update up, in red: how long it has taken so far. */
+@Composable
+private fun SlowMark(seconds: Long, modifier: Modifier = Modifier) {
+    Text(
+        "Slow · $seconds s",
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.error,
+        maxLines = 1,
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(4.dp))
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.9f))
+                .padding(horizontal = 6.dp, vertical = 2.dp),
+    )
+}
+
+/** Why the last update couldn't check a novel, as a red block. */
+@Composable
+private fun UpdateError(message: String, modifier: Modifier = Modifier) {
+    Text(
+        message,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.error,
+        maxLines = 4,
+        overflow = TextOverflow.Ellipsis,
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(4.dp))
+                .background(MaterialTheme.colorScheme.errorContainer)
+                .padding(horizontal = 6.dp, vertical = 4.dp),
+    )
+}
+
+/**
+ * Drawn without colour and faded, by [amount] from 0 (as it is) to 1 (fully): a novel the running update has yet to
+ * finish checking. Animated, it fades back in as the check finishes.
+ */
+private fun Modifier.greyed(amount: Float): Modifier =
+    if (amount <= 0f) {
+        this
+    } else {
+        drawWithCache {
+            val paint =
+                Paint().apply {
+                    colorFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(1f - amount) })
+                    alpha = 1f - GREYED_FADE * amount
+                }
+            onDrawWithContent {
+                drawContext.canvas.saveLayer(size.toRect(), paint)
+                drawContent()
+                drawContext.canvas.restore()
+            }
+        }
+    }
+
+/** How much of a greyed novel fades away. */
+private const val GREYED_FADE = 0.6f
 
 /** A tap, and a long press where the library can't be dragged (where it can, the drag takes long presses). */
 @OptIn(ExperimentalFoundationApi::class)
