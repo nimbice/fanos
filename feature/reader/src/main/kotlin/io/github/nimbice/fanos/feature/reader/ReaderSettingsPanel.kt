@@ -75,7 +75,6 @@ import androidx.compose.ui.semantics.semantics
 import kotlinx.coroutines.launch
 import android.content.Context
 import android.provider.Settings
-import io.github.nimbice.fanos.core.designsystem.icon.ReaderIcons
 import io.github.nimbice.fanos.core.model.PageTurn
 import io.github.nimbice.fanos.core.model.TapZones
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -221,17 +220,7 @@ internal fun ReaderSettingsPanel(
                                 }
                                 // Brightness and warmth are the phone's, whichever settings the novel follows.
                                 SectionHeader("Brightness", own = false, isDefault = true, onSetAsDefault = {})
-                                val deviceLevel = remember(context) { deviceBrightness(context) }
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(ReaderIcons.BrightnessLow, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
-                                    Slider(
-                                        value = shown.brightness ?: deviceLevel,
-                                        onValueChange = { value -> onBrightness((value * 100).roundToInt() / 100f) },
-                                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp).semantics { contentDescription = "Brightness" },
-                                    )
-                                    Icon(ReaderIcons.BrightnessHigh, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
-                                }
-                                FilterChip(selected = shown.brightness == null, onClick = { onBrightness(null) }, label = { Text("This device\u2019s own") })
+                                BrightnessSlider(shown.brightness, onBrightness)
                                 Text(
                                     "Only while reading. Below this device\u2019s lowest, the page dims further.",
                                     style = MaterialTheme.typography.bodySmall,
