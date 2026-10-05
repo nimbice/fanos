@@ -1,0 +1,2 @@
+• Fanos checks for updates once a day, for the app and its extensions
+• An update waiting to be installed has a Check again button beside Install

@@ -1,0 +1,46 @@
+name: Something's wrong
+description: A crash, an error, or something that doesn't work as it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for writing in. One problem per report, please.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to make it happen again
+      placeholder: |
+        1. Open …
+        2. Tap …
+  - type: input
+    id: version
+    attributes:
+      label: Fanos version
+      description: Settings › Updates › Version
+      placeholder: "0.1.3"
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Phone and Android version
+      placeholder: "Pixel 8, Android 16"
+  - type: input
+    id: site
+    attributes:
+      label: Site and extension version, if it's about one
+      description: Browse › Extensions shows each extension's version.
+      placeholder: "Royal Road 8.3"
+  - type: textarea
+    id: crash
+    attributes:
+      label: Crash report
+      description: If Fanos crashed, Settings › About › Share gives the report. It names the build, the phone and what went wrong, nothing you read.
+      render: text

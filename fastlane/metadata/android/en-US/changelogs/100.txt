@@ -1,0 +1,4 @@
+• The first public release
+• A reader for web novels: your library, chapters read in pages or by scrolling, themes and fonts, a built-in dictionary, footnotes and quote cards
+• Listening with natural voices, downloads for reading offline, backups, and reading-list sync with Novel Updates
+• Sites come as extensions: Royal Road, Scribble Hub, Novel Updates and Patreon

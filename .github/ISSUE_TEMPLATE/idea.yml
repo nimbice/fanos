@@ -1,0 +1,14 @@
+name: An idea
+description: Something Fanos could do, or do better
+labels: [idea]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+      description: What would you like Fanos to do, and what would it help you with?
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: Asking for a site? Fanos's extensions are for sites that publish their authors' own work. Requests for sites that repost other people's stories are closed.
