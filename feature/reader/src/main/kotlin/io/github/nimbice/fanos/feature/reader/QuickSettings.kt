@@ -10,24 +10,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import io.github.nimbice.fanos.core.designsystem.icon.ReaderIcons
 import io.github.nimbice.fanos.core.model.ReaderSettings
 import io.github.nimbice.fanos.core.model.ReaderTheme
-import kotlin.math.roundToInt
 
 /**
  * Over the bottom bar while the controls show: the text size, the colours and the brightness, to change in passing.
@@ -35,8 +29,6 @@ import kotlin.math.roundToInt
  */
 @Composable
 internal fun QuickSettings(settings: ReaderSettings, onChange: ((ReaderSettings) -> ReaderSettings) -> Unit, onBrightness: (Float?) -> Unit, modifier: Modifier = Modifier) {
-    val context = LocalContext.current
-    val deviceLevel = remember(context) { deviceBrightness(context) }
     Surface(modifier = modifier, shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainerLow, shadowElevation = 6.dp) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -54,15 +46,7 @@ internal fun QuickSettings(settings: ReaderSettings, onChange: ((ReaderSettings)
                     }
                 }
             }
-            Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(ReaderIcons.BrightnessLow, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
-                Slider(
-                    value = settings.brightness ?: deviceLevel,
-                    onValueChange = { value -> onBrightness((value * 100).roundToInt() / 100f) },
-                    modifier = Modifier.weight(1f).padding(horizontal = 8.dp).semantics { contentDescription = "Brightness" },
-                )
-                Icon(ReaderIcons.BrightnessHigh, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
-            }
+            BrightnessSlider(settings.brightness, onBrightness, Modifier.fillMaxWidth().padding(top = 4.dp))
         }
     }
 }
