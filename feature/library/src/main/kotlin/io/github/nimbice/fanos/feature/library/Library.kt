@@ -69,7 +69,6 @@ import io.github.nimbice.fanos.core.model.LibrarySort
 import io.github.nimbice.fanos.core.model.LibraryUpdateProgress
 import io.github.nimbice.fanos.core.model.SearchHistory
 import io.github.nimbice.fanos.core.model.UpdateInterval
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -127,7 +126,7 @@ class LibraryViewModel @Inject constructor(
     val recent = settings.recentSearches(SearchHistory.Novels, viewModelScope)
 
     val state: StateFlow<LibraryUiState> =
-        combine(library.observeLibrary(), sectionRepository.observeSections(), settings.appSettings, scheduler.progress) { novels, sections, app, update ->
+        combine(library.observeLibrary(), sectionRepository.observeSections(), settings.appSettings, library.progress) { novels, sections, app, update ->
             val notifying = app.newChapterNotifications && app.libraryUpdateInterval != UpdateInterval.Off
             LibraryUiState(novels, sections, app.libraryDisplay, app.libraryFilters, app.librarySort, update, notifying, loaded = true)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryUiState())
@@ -289,7 +288,6 @@ fun LibraryScreen(
     Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { padding ->
         Column(Modifier.fillMaxSize().scaffoldContent(padding)) {
             if (state.novels.isNotEmpty()) {
-                val waitingOn = slowCheck(state.update)
                 when {
                     selected.isNotEmpty() ->
                         SelectionBar(
@@ -342,8 +340,7 @@ fun LibraryScreen(
                         )
                     else ->
                         LibraryHeader(
-                            text = waitingOn ?: novels.sumOf { it.unreadCount }.takeIf { it > 0 }?.let { "${number(it)} unread" }.orEmpty(),
-                            highlighted = waitingOn != null,
+                            text = novels.sumOf { it.unreadCount }.takeIf { it > 0 }?.let { "${number(it)} unread" }.orEmpty(),
                             filtered = state.filters.isNotEmpty(),
                             onSearch = { searching = true },
                             onFilter = { filtering = true },
@@ -380,6 +377,9 @@ fun LibraryScreen(
                         onOpenNovel(item.novel.id)
                     }
                 }
+                // An update greys out the novels it has yet to check, and says which are holding it up.
+                val waiting = state.update?.waiting.orEmpty()
+                val checking = state.update?.checking.orEmpty()
                 // Where novels can't be dragged, a long press selects at once.
                 val hold: ((LibraryNovel) -> Unit)? = if (canDrag) null else { item -> toggle(item.novel.id) }
                 when {
@@ -405,6 +405,8 @@ fun LibraryScreen(
                                     LibraryRow(
                                         item = item,
                                         sourceName = sourceNames[item.novel.sourceId] ?: item.novel.site,
+                                        waiting = item.novel.id in waiting,
+                                        checkingSince = checking[item.novel.id],
                                         dragging = dragging,
                                         selected = item.novel.id in selected,
                                         onClick = { open(item) },
@@ -425,6 +427,8 @@ fun LibraryScreen(
                                 ReorderableItem(gridReorder, key = item.novel.id) { dragging ->
                                     LibraryItem(
                                         item = item,
+                                        waiting = item.novel.id in waiting,
+                                        checkingSince = checking[item.novel.id],
                                         dragging = dragging,
                                         selected = item.novel.id in selected,
                                         onClick = { open(item) },
@@ -503,28 +507,6 @@ fun LibraryScreen(
 
 /** The dialogs the library's selection opens. */
 internal enum class LibraryDialog { Sections, Download, RemoveBooks }
-
-/**
- * During an update, the novel it has been waiting on longest, once that has taken more than a few
- * seconds: a check that hangs shows which novel is holding the update up. Counts up each second.
- */
-@Composable
-private fun slowCheck(update: LibraryUpdateProgress?): String? {
-    if (update == null) return null
-    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(1_000)
-            now = System.currentTimeMillis()
-        }
-    }
-    val slow = update.checking.filter { now - it.startedAt >= SLOW_CHECK_MS }
-    val longest = slow.minByOrNull { it.startedAt } ?: return null
-    val seconds = (now - longest.startedAt) / 1_000
-    return "Checking ${longest.title} · $seconds s" + if (slow.size > 1) " (and ${slow.size - 1} more)" else ""
-}
-
-private const val SLOW_CHECK_MS = 5_000L
 
 /**
  * New-chapter notifications are on from the start, but from Android 13 the app must ask before

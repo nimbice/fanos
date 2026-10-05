@@ -58,6 +58,8 @@ data class LibraryNovel(
     val savedChapters: Int = 0,
     /** When the latest of the chapters the reader follows arrived, epoch milliseconds. */
     val latestChapterAt: Long? = null,
+    /** Why the last library update couldn't check it, until its chapters are fetched cleanly again; null when they were. */
+    val updateError: String? = null,
 )
 
 /** A section of the library, a tab of its own; a novel can be in several. */
@@ -70,16 +72,15 @@ data class LibrarySection(val id: Long, val name: String) {
     }
 }
 
-/** How a library update is going: novels checked so far, and the ones being checked right now. */
+/** How a library update is going: novels checked so far, the ones still to check, and those being checked right now. */
 data class LibraryUpdateProgress(
     val done: Int,
     val total: Int,
-    /** Oldest first. */
-    val checking: List<NovelCheck> = emptyList(),
+    /** The novels not checked yet, by id: those being checked and those still to come. */
+    val waiting: Set<Long> = emptySet(),
+    /** The novels being checked right now, by id, and since when (epoch milliseconds). */
+    val checking: Map<Long, Long> = emptyMap(),
 )
-
-/** A novel being checked for new chapters, and since when (epoch milliseconds). */
-data class NovelCheck(val title: String, val startedAt: Long)
 
 /** A novel as a source lists it in search results or its catalogue, before the app stores it. */
 data class NovelSummary(

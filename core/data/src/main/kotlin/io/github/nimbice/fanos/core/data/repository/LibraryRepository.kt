@@ -4,15 +4,18 @@ import io.github.nimbice.fanos.core.common.Clock
 import io.github.nimbice.fanos.core.common.suspendRunCatching
 import io.github.nimbice.fanos.core.data.source.SourceRegistry
 import io.github.nimbice.fanos.core.data.toModel
+import io.github.nimbice.fanos.core.data.userMessage
 import io.github.nimbice.fanos.core.database.TransactionRunner
 import io.github.nimbice.fanos.core.database.dao.NovelDao
 import io.github.nimbice.fanos.core.model.LibraryNovel
 import io.github.nimbice.fanos.core.model.LibraryUpdateProgress
-import io.github.nimbice.fanos.core.model.NovelCheck
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
@@ -69,55 +72,69 @@ class LibraryRepository @Inject constructor(
         return ids
     }
 
+    private val _progress = MutableStateFlow<LibraryUpdateProgress?>(null)
+
+    /** How the running update is going, novel by novel, or null when none is running. */
+    val progress: StateFlow<LibraryUpdateProgress?> = _progress.asStateFlow()
+
+    private val running = Mutex()
+
     /**
      * Checks every library novel for new chapters, in the library's order. Several novels are checked
      * at once; the network layer keeps each site to a couple of requests at a time. A failing novel
-     * does not stop the rest. [onProgress] hears as each novel starts and finishes, so a novel that
-     * holds the update up can be named. [onFound] hears of each novel's new chapters once they are
-     * saved, so a check stopped part way still knows what it found. Neither hears two novels at once.
-     * Novels whose extension isn't installed are left out: there is nothing to check them with.
+     * does not stop the rest, and keeps why it failed for the library to show ([LibraryNovel.updateError]).
+     * [progress] follows each novel as it starts and finishes. [onFound] hears of each novel's new chapters
+     * once they are saved, so a check stopped part way still knows what it found; it never hears two at once.
+     * Novels whose extension isn't installed are left out: there is nothing to check them with. One update
+     * runs at a time: one asked for while another runs (the scheduled one and the reader's) leaves it to that one.
      */
-    suspend fun update(
-        onProgress: suspend (LibraryUpdateProgress) -> Unit = {},
-        onFound: suspend (NovelUpdate) -> Unit = {},
-    ): LibraryUpdateResult {
-        val available = sources.ids()
-        val (novelsToCheck, withoutExtension) = novelDao.libraryTitles().partition { it.sourceId in available }
-        var done = 0
-        val checking = LinkedHashMap<Long, NovelCheck>()
-        val lock = Mutex()
-        suspend fun report(change: () -> Unit) =
-            lock.withLock {
-                change()
-                onProgress(LibraryUpdateProgress(done, novelsToCheck.size, checking.values.toList()))
-            }
-        val permits = Semaphore(PARALLEL_NOVELS)
-        val results =
-            coroutineScope {
-                novelsToCheck.map { novel ->
-                    async {
-                        permits.withPermit {
-                            report { checking[novel.id] = NovelCheck(novel.title, System.currentTimeMillis()) }
-                            val result =
-                                suspendRunCatching { novels.refreshChapters(novel.id) }.map { found ->
-                                    NovelUpdate(novel.id, novel.title, found.map { it.title }, found.map { it.id })
+    suspend fun update(onFound: suspend (NovelUpdate) -> Unit = {}): LibraryUpdateResult {
+        if (!running.tryLock()) return LibraryUpdateResult(checked = 0, withoutExtension = 0, updated = emptyList(), failures = emptyMap())
+        try {
+            val available = sources.ids()
+            val (novelsToCheck, withoutExtension) = novelDao.libraryTitles().partition { it.sourceId in available }
+            val waiting = novelsToCheck.mapTo(LinkedHashSet()) { it.id }
+            val checking = LinkedHashMap<Long, Long>()
+            val lock = Mutex()
+            suspend fun report(change: () -> Unit) =
+                lock.withLock {
+                    change()
+                    _progress.value = LibraryUpdateProgress(novelsToCheck.size - waiting.size, novelsToCheck.size, waiting.toSet(), checking.toMap())
+                }
+            report {}
+            val permits = Semaphore(PARALLEL_NOVELS)
+            val results =
+                coroutineScope {
+                    novelsToCheck.map { novel ->
+                        async {
+                            permits.withPermit {
+                                report { checking[novel.id] = System.currentTimeMillis() }
+                                val result =
+                                    suspendRunCatching { novels.refreshChapters(novel.id) }.map { found ->
+                                        NovelUpdate(novel.id, novel.title, found.map { it.title }, found.map { it.id })
+                                    }
+                                // Kept before the novel stops waiting, so the library shows it the moment it's done.
+                                result.exceptionOrNull()?.let { error -> novelDao.setUpdateError(novel.id, userMessage(error)) }
+                                report {
+                                    checking.remove(novel.id)
+                                    waiting.remove(novel.id)
                                 }
-                            report {
-                                checking.remove(novel.id)
-                                done++
+                                result.getOrNull()?.takeIf { it.chapters.isNotEmpty() }?.let { found -> lock.withLock { onFound(found) } }
+                                novel.id to result
                             }
-                            result.getOrNull()?.takeIf { it.chapters.isNotEmpty() }?.let { found -> lock.withLock { onFound(found) } }
-                            novel.id to result
                         }
-                    }
-                }.awaitAll()
-            }
-        return LibraryUpdateResult(
-            checked = novelsToCheck.size,
-            withoutExtension = withoutExtension.size,
-            updated = results.mapNotNull { (_, result) -> result.getOrNull()?.takeIf { it.chapters.isNotEmpty() } },
-            failures = results.mapNotNull { (id, result) -> result.exceptionOrNull()?.let { id to it } }.toMap(),
-        )
+                    }.awaitAll()
+                }
+            return LibraryUpdateResult(
+                checked = novelsToCheck.size,
+                withoutExtension = withoutExtension.size,
+                updated = results.mapNotNull { (_, result) -> result.getOrNull()?.takeIf { it.chapters.isNotEmpty() } },
+                failures = results.mapNotNull { (id, result) -> result.exceptionOrNull()?.let { id to it } }.toMap(),
+            )
+        } finally {
+            _progress.value = null
+            running.unlock()
+        }
     }
 
     private companion object {

@@ -31,7 +31,6 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -41,6 +40,7 @@ import okio.Buffer
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
+import java.net.SocketTimeoutException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
@@ -248,7 +248,7 @@ class BrowserFetcher @Inject constructor(@ApplicationContext private val context
         while (pageLoads.tryReceive().isSuccess) Unit
         webView.addJavascriptInterface(bridge, BRIDGE)
         webView.loadDataWithBaseURL(site, "<!DOCTYPE html><title></title>", "text/html", "utf-8", null)
-        withTimeout(PAGE_MS) { pageLoads.receive() }
+        within(PAGE_MS) { pageLoads.receive() }
         origin = site
     }
 
@@ -293,7 +293,7 @@ class BrowserFetcher @Inject constructor(@ApplicationContext private val context
             // Still on the check after all this time: the reader has to pass it. Otherwise the page is just slow.
             if (onCheck(webView)) throw ChallengeRequiredException(finalUrl)
             open(webView, site)
-            throw IOException("$finalUrl took too long to load")
+            throw SocketTimeoutException("$finalUrl took too long to load")
         }
         pageError?.let { error ->
             open(webView, site)
@@ -321,7 +321,7 @@ class BrowserFetcher @Inject constructor(@ApplicationContext private val context
     }
 
     private suspend fun evaluate(webView: WebView, expression: String): String =
-        withTimeout(REQUEST_MS) {
+        within(REQUEST_MS) {
             suspendCancellableCoroutine { continuation ->
                 // The result comes back as JSON: a string literal here.
                 webView.evaluateJavascript(expression) { result -> continuation.resume(JSONArray("[$result]").optString(0)) }
@@ -331,7 +331,7 @@ class BrowserFetcher @Inject constructor(@ApplicationContext private val context
     private suspend fun send(webView: WebView, request: Request): HttpResponse {
         val id = ids.incrementAndGet()
         val script = script(id, request)
-        return withTimeout(REQUEST_MS) {
+        return within(REQUEST_MS) {
             suspendCancellableCoroutine { continuation ->
                 pending[id] = continuation
                 continuation.invokeOnCancellation { pending.remove(id) }
@@ -339,6 +339,13 @@ class BrowserFetcher @Inject constructor(@ApplicationContext private val context
             }
         }
     }
+
+    /**
+     * [block], given [millis] to finish. Running out of time is a [SocketTimeoutException], as for any request that takes
+     * too long: withTimeout's own cancellation would stop whoever asked, a whole library update with it, not just this.
+     */
+    private suspend fun <T : Any> within(millis: Long, block: suspend CoroutineScope.() -> T): T =
+        withTimeoutOrNull(millis, block) ?: throw SocketTimeoutException("The browser waited ${millis / 1_000} s for an answer")
 
     private fun script(id: Int, request: Request): String {
         val headers = JSONObject()

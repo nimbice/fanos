@@ -8,18 +8,13 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
 import androidx.work.PeriodicWorkRequestBuilder
-import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.nimbice.fanos.core.common.ApplicationScope
 import io.github.nimbice.fanos.core.data.repository.SettingsRepository
-import io.github.nimbice.fanos.core.model.LibraryUpdateProgress
-import io.github.nimbice.fanos.core.model.NovelCheck
 import io.github.nimbice.fanos.core.model.UpdateInterval
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -75,26 +70,6 @@ class LibraryUpdateScheduler @Inject constructor(
                 .build()
         workManager.enqueueUniqueWork(MANUAL, ExistingWorkPolicy.KEEP, request)
     }
-
-    /** How the running update (manual or scheduled) is going, or null when none is running. */
-    val progress: Flow<LibraryUpdateProgress?> =
-        running().map { work ->
-            work ?: return@map null
-            val data = work.progress
-            val titles = data.getStringArray(LibraryUpdateWorker.KEY_CHECKING).orEmpty()
-            val since = data.getLongArray(LibraryUpdateWorker.KEY_CHECKING_SINCE) ?: LongArray(0)
-            LibraryUpdateProgress(
-                done = data.getInt(LibraryUpdateWorker.KEY_DONE, 0),
-                total = data.getInt(LibraryUpdateWorker.KEY_TOTAL, 0),
-                checking = titles.zip(since.toList()) { title, startedAt -> NovelCheck(title, startedAt) },
-            )
-        }.distinctUntilChanged()
-
-    private fun running(): Flow<WorkInfo?> =
-        combine(
-            workManager.getWorkInfosForUniqueWorkFlow(MANUAL),
-            workManager.getWorkInfosForUniqueWorkFlow(PERIODIC),
-        ) { manual, periodic -> (manual + periodic).firstOrNull { it.state == WorkInfo.State.RUNNING } }
 
     private companion object {
         const val PERIODIC = "library-update"
