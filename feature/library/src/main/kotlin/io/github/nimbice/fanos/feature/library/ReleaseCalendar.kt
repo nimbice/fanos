@@ -127,6 +127,8 @@ private fun CalendarRow(novel: CalendarNovel, today: Boolean, now: LocalDate, is
         line = line,
         faded = false,
         onClick = { onOpenNovel(novel.novelId) },
+        // Days, chapters at a time, the window and the time of day: at a large text size that's more than two lines.
+        lineMaxLines = 5,
     ) {
         if (pattern is ReleasePattern.Between) {
             Text(

@@ -100,7 +100,7 @@ class ReleasePatternTest {
         val now = releasePattern(days, sunday) as ReleasePattern.Between
         assertEquals("could be today, or as late as Wed", windowText(now, sunday, Locale.ENGLISH))
         assertEquals(
-            "New chapters every 6 to 9 days, no set day, around 6 PM\nNext could be today, or as late as Wednesday",
+            "New chapters every 6 to 9 days, no set day, around 6\u00A0PM\nNext could be today, or as late as Wednesday",
             releaseText(now, sunday, Locale.ENGLISH, time = ReleaseTime.At(LocalTime.of(18, 0))),
         )
     }
@@ -114,7 +114,7 @@ class ReleasePatternTest {
         assertEquals(2, chaptersPerDay(days))
         assertEquals("2 chapters a day", perDayText(pattern!!, 2))
         assertEquals(
-            "New chapters every day, 2 a day, around 6 PM",
+            "New chapters every day, 2 a day, around 6\u00A0PM",
             releaseText(pattern, today, Locale.ENGLISH, time = ReleaseTime.At(LocalTime.of(18, 0)), perDay = 2),
         )
         // Two at a time on set days.
@@ -156,16 +156,16 @@ class ReleasePatternTest {
 
     @Test
     fun `times of day in words`() {
-        assertEquals("around 6 PM", timeText(ReleaseTime.At(LocalTime.of(18, 0))))
-        assertEquals("around 6:30 AM", timeText(ReleaseTime.At(LocalTime.of(6, 30))))
+        assertEquals("around 6\u00A0PM", timeText(ReleaseTime.At(LocalTime.of(18, 0))))
+        assertEquals("around 6:30\u00A0AM", timeText(ReleaseTime.At(LocalTime.of(6, 30))))
         assertEquals("around 18:00", timeText(ReleaseTime.At(LocalTime.of(18, 0)), is24Hour = true))
-        assertEquals("between 2 and 5 PM", timeText(ReleaseTime.Window(LocalTime.of(14, 0), LocalTime.of(17, 0))))
-        assertEquals("between 11 PM and 1 AM", timeText(ReleaseTime.Window(LocalTime.of(23, 0), LocalTime.of(1, 0))))
-        assertEquals("between 9:30 AM and 12 PM", timeText(ReleaseTime.Window(LocalTime.of(9, 30), LocalTime.of(12, 0))))
+        assertEquals("between 2 and 5\u00A0PM", timeText(ReleaseTime.Window(LocalTime.of(14, 0), LocalTime.of(17, 0))))
+        assertEquals("between 11\u00A0PM and 1\u00A0AM", timeText(ReleaseTime.Window(LocalTime.of(23, 0), LocalTime.of(1, 0))))
+        assertEquals("between 9:30\u00A0AM and 12\u00A0PM", timeText(ReleaseTime.Window(LocalTime.of(9, 30), LocalTime.of(12, 0))))
         assertEquals("between 14:00 and 17:00", timeText(ReleaseTime.Window(LocalTime.of(14, 0), LocalTime.of(17, 0)), is24Hour = true))
         val weekly = ReleasePattern.Weekdays(listOf(DayOfWeek.MONDAY, DayOfWeek.THURSDAY), LocalDate.of(2026, 10, 2))
         assertEquals(
-            "New chapters usually Mon and Thu, around 6 PM\nNext about tomorrow",
+            "New chapters usually Mon and Thu, around 6\u00A0PM\nNext about tomorrow",
             releaseText(weekly, today, Locale.ENGLISH, time = ReleaseTime.At(LocalTime.of(18, 0))),
         )
     }
