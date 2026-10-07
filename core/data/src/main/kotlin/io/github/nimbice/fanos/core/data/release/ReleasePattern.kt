@@ -18,8 +18,8 @@ sealed interface ReleasePattern {
     /** On these days of the week, the [next] of them due then. */
     data class Weekdays(val days: List<DayOfWeek>, val next: LocalDate) : ReleasePattern
 
-    /** Most days of the week. */
-    data object MostDays : ReleasePattern
+    /** Most days of the week; [everyDay] when it's nearly every one. */
+    data class MostDays(val everyDay: Boolean = false) : ReleasePattern
 
     /** Every so many [days], the [next] due then. */
     data class Every(val days: Int, val next: LocalDate) : ReleasePattern
@@ -104,12 +104,15 @@ fun releasePattern(days: Collection<LocalDate>, today: LocalDate): ReleasePatter
     if (recent.size < MIN_RELEASES) return null
     val first = recent.first()
     val span = ChronoUnit.DAYS.between(first, last) + 1
-    if (span < MIN_SPAN) return null
+    // A week of chapters most days is enough to call it daily: a novel only just added, its chapters undated, has no more.
+    if (span < MIN_SPAN_DAILY) return null
     val gaps = recent.zipWithNext { a, b -> ChronoUnit.DAYS.between(a, b).toInt() }
     val typical = gaps.sorted()[gaps.size / 2]
     // Long past when the next was due: a pause, not a pattern to go by.
     if (ChronoUnit.DAYS.between(last, today) > maxOf(STALE_DAYS, typical * 3L)) return null
-    if (recent.size >= span * MOST_DAYS) return ReleasePattern.MostDays
+    if (recent.size >= span * MOST_DAYS) return ReleasePattern.MostDays(everyDay = recent.size >= span * EVERY_DAY)
+    // Days of the week and steps of so many days take a few weeks to tell.
+    if (span < MIN_SPAN) return null
     // The days of the week most weeks had a chapter on, when they had most of the chapters.
     val counts = recent.groupingBy { it.dayOfWeek }.eachCount()
     val regular = DayOfWeek.entries.filter { day -> (counts[day] ?: 0).let { it >= 2 && it >= occurrences(day, first, last) * REGULAR_SHARE } }
@@ -123,13 +126,13 @@ fun releasePattern(days: Collection<LocalDate>, today: LocalDate): ReleasePatter
             return ReleasePattern.Every(typical, maxOf(last.plusDays(typical.toLong()), today))
         }
     }
-    // On no set day, but three in four of the gaps within a few days of one another: the next any day in that window.
+    // On no set day, but three in four of the gaps within a week's window: the next any day in it.
     val need = ceil(gaps.size * BETWEEN_SHARE).toInt()
     val sorted = gaps.sorted()
     val start = (0..sorted.size - need).minBy { sorted[it + need - 1] - sorted[it] }
     val shortest = sorted[start]
     val longest = sorted[start + need - 1]
-    if (longest > shortest && longest <= shortest * 3 && longest - shortest <= MAX_WINDOW_DAYS) {
+    if (longest > shortest && longest - shortest <= MAX_WINDOW_DAYS) {
         val from = maxOf(last.plusDays(shortest.toLong()), today)
         return ReleasePattern.Between(shortest, longest, from, maxOf(last.plusDays(longest.toLong()), from))
     }
@@ -146,15 +149,33 @@ fun releaseText(
     locale: Locale = Locale.getDefault(),
     time: ReleaseTime? = null,
     is24Hour: Boolean = false,
+    perDay: Int = 1,
 ): String {
-    val at = time?.let { ", " + timeText(it, is24Hour) }.orEmpty()
+    val at = (perDayText(pattern, perDay, short = true)?.let { ", $it" }.orEmpty()) + time?.let { ", " + timeText(it, is24Hour) }.orEmpty()
     return when (pattern) {
-        ReleasePattern.MostDays -> "New chapters most days$at"
+        is ReleasePattern.MostDays -> "New chapters ${if (pattern.everyDay) "every day" else "most days"}$at"
         is ReleasePattern.Weekdays -> "New chapters usually ${weekdays(pattern.days, locale)}$at\nNext ${whenDue(pattern.next, today, locale)}"
         is ReleasePattern.Every -> "New chapters about ${every(pattern.days)}$at\nNext ${whenDue(pattern.next, today, locale)}"
         is ReleasePattern.Between ->
             "New chapters every ${pattern.shortest} to ${pattern.longest} days, no set day$at\nNext ${nextBetween(pattern, today, locale)}"
     }
+}
+
+/**
+ * How many chapters come out at once, when it's more than one: "2 chapters a day" for a novel out every day, else
+ * "2 chapters at a time"; [short], "2 a day" and "2 at a time". Null for one.
+ */
+fun perDayText(pattern: ReleasePattern, perDay: Int, short: Boolean = false): String? {
+    if (perDay < 2) return null
+    val what = if (short) "$perDay" else "$perDay chapters"
+    return if (pattern is ReleasePattern.MostDays && pattern.everyDay) "$what a day" else "$what at a time"
+}
+
+/** How many chapters usually come out on a day one does, going by the last eight weeks' [days] (one for each chapter). */
+fun chaptersPerDay(days: Collection<LocalDate>): Int {
+    val last = days.maxOrNull() ?: return 0
+    val counts = days.filter { it > last.minusDays(WINDOW_DAYS) }.groupingBy { it }.eachCount().values.sorted()
+    return counts[(counts.size - 1) / 2]
 }
 
 /** The time of day in words: "around 6 PM", "between 2 and 5 PM", "between 11 PM and 1 AM"; on a 24-hour clock "around 18:00". */
@@ -182,10 +203,10 @@ fun windowText(pattern: ReleasePattern.Between, today: LocalDate, locale: Locale
     }
 }
 
-/** The pattern alone, for a list of novels: "Mon, Wed and Fri", "Fridays", "Every 3 days", "Most days". */
+/** The pattern alone, for a list of novels: "Mon, Wed and Fri", "Fridays", "Every 3 days", "Every day", "Most days". */
 fun patternText(pattern: ReleasePattern, locale: Locale = Locale.getDefault()): String =
     when (pattern) {
-        ReleasePattern.MostDays -> "Most days"
+        is ReleasePattern.MostDays -> if (pattern.everyDay) "Every day" else "Most days"
         is ReleasePattern.Weekdays ->
             if (pattern.days.size == 1) "${pattern.days.single().getDisplayName(TextStyle.FULL, locale)}s" else weekdays(pattern.days, locale)
         is ReleasePattern.Every -> every(pattern.days).replaceFirstChar { it.uppercase() }
@@ -195,7 +216,7 @@ fun patternText(pattern: ReleasePattern, locale: Locale = Locale.getDefault()): 
 /** Whether a novel with this pattern has a chapter due on [day]; one with no set day only on its earliest. */
 fun ReleasePattern.dueOn(day: LocalDate): Boolean =
     when (this) {
-        ReleasePattern.MostDays -> true
+        is ReleasePattern.MostDays -> true
         is ReleasePattern.Weekdays -> day.dayOfWeek in days
         is ReleasePattern.Every -> !day.isBefore(next) && ChronoUnit.DAYS.between(next, day) % days == 0L
         is ReleasePattern.Between -> day == from
@@ -281,11 +302,15 @@ private const val WINDOW_DAYS = 56L
 private const val MIN_RELEASES = 6
 private const val MIN_SPAN = 21L
 
+/** A week is enough to tell a novel out most days; the other patterns need [MIN_SPAN]. */
+private const val MIN_SPAN_DAILY = 7L
+
 /** No chapter for this long, or three of its usual gaps if longer, and there's no pattern to go by. */
 private const val STALE_DAYS = 14L
 
-/** Chapters on this share of the days, or more, is most days. */
+/** Chapters on this share of the days, or more, is most days; on this share, every day. */
 private const val MOST_DAYS = 0.6
+private const val EVERY_DAY = 0.9
 
 /** A day of the week is a release day when this share of its weeks had a chapter on it. */
 private const val REGULAR_SHARE = 0.6
@@ -299,7 +324,7 @@ private const val STEADY_SHARE = 0.7
 
 /** For "every so many to so many days": this share of the gaps within a window of at most so many days. */
 private const val BETWEEN_SHARE = 0.75
-private const val MAX_WINDOW_DAYS = 7
+private const val MAX_WINDOW_DAYS = 6
 
 /** A time of day when this share of the chapters came out within [STEADY_MINUTES] of one another, a window within [WINDOW_MINUTES]. */
 private const val TIME_SHARE = 0.75
