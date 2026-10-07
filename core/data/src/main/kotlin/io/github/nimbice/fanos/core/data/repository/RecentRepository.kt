@@ -22,6 +22,7 @@ import java.time.ZoneId
 import io.github.nimbice.fanos.core.data.release.ReleaseTime
 import io.github.nimbice.fanos.core.data.release.releaseTime
 import io.github.nimbice.fanos.core.data.release.siteDated
+import io.github.nimbice.fanos.core.data.release.estimatedReleaseTime
 
 /** What came in lately (chapters that arrived in library novels) and what was read lately (the novels read, last first). */
 @Singleton
@@ -44,7 +45,7 @@ class RecentRepository @Inject constructor(
 
     /**
      * Library novels still coming out, with the days their chapters came out of late (when new ones usually do), and the
-     * time of day they do when the site gives its own times.
+     * time of day they do: the site's own, or estimated from when this device's checks found them.
      */
     suspend fun releaseDays(zone: ZoneId): List<NovelReleaseDays> {
         val since = clock.now() - RELEASE_HISTORY_MS
@@ -55,7 +56,12 @@ class RecentRepository @Inject constructor(
                 val rows = times[novel.novelId] ?: return@mapNotNull null
                 val published = rows.mapNotNull { it.publishedAt }.filter { it >= since }
                 val chosen = releaseTimes(novel.chapters, novel.dated, novel.firstAddedAt, published, rows.map { it.addedAt })
-                val time = if (siteDated(novel.chapters, novel.dated)) releaseTime(published, zone) else null
+                val time =
+                    if (siteDated(novel.chapters, novel.dated)) {
+                        releaseTime(published, zone)
+                    } else {
+                        estimatedReleaseTime(rows.mapNotNull { row -> row.seenAfter?.let { it to row.addedAt } }, zone)
+                    }
                 NovelReleaseDays(novel.novelId, novel.novelTitle, novel.coverUrl, chosen.map { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() }, time)
             }
     }

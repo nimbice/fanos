@@ -79,6 +79,11 @@ data class ChapterEntity(
     @ColumnInfo(name = "removed_at") val removedAt: Long? = null,
     /** When the app first saw the chapter. */
     @ColumnInfo(name = "added_at") val addedAt: Long,
+    /**
+     * When the chapter list was fetched before the one that found this chapter: it came out between then and [addedAt].
+     * Null for the chapters a novel came with.
+     */
+    @ColumnInfo(name = "seen_after") val seenAfter: Long? = null,
     /** The site lists it as one the reader can't read now, such as a Patreon post above their tier. */
     @ColumnInfo(defaultValue = "0") val locked: Boolean = false,
     /** The translation group that put it out, when the site says: Novel Updates lists several groups' side by side. */
@@ -178,6 +183,7 @@ data class ReleaseTimeRow(
     @ColumnInfo(name = "novel_id") val novelId: Long,
     @ColumnInfo(name = "published_at") val publishedAt: Long?,
     @ColumnInfo(name = "added_at") val addedAt: Long,
+    @ColumnInfo(name = "seen_after") val seenAfter: Long? = null,
 )
 
 /** A chapter that arrived in a library novel, with what the Updates list shows of it. */

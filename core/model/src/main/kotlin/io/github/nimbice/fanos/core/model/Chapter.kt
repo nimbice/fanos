@@ -18,6 +18,8 @@ data class Chapter(
     val group: String? = null,
     /** When this device first saw it listed, epoch milliseconds. */
     val addedAt: Long? = null,
+    /** When this device last checked before it saw it: the chapter came out between then and [addedAt]. */
+    val seenAfter: Long? = null,
 ) {
     val isRead: Boolean get() = readAt != null
 }

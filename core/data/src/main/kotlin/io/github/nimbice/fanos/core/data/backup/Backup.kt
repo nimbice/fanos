@@ -82,6 +82,8 @@ internal data class BackupChapter(
     val readAt: Long? = null,
     val removedAt: Long? = null,
     val addedAt: Long? = null,
+    /** When the chapter list was last fetched before this chapter was seen, for its time of day. */
+    val seenAfter: Long? = null,
     /** Where the reader left the chapter. */
     val progress: BackupProgress? = null,
     /** Paragraphs of it the reader bookmarked. */
