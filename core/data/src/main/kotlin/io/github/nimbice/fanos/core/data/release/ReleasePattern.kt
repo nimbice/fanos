@@ -10,6 +10,8 @@ import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 import kotlin.math.abs
+import java.time.LocalTime
+import kotlin.math.ceil
 
 /** When a novel's chapters come out, going by when the last few weeks' did. */
 sealed interface ReleasePattern {
@@ -21,7 +23,23 @@ sealed interface ReleasePattern {
 
     /** Every so many [days], the [next] due then. */
     data class Every(val days: Int, val next: LocalDate) : ReleasePattern
+
+    /**
+     * Every [shortest] to [longest] days, on no set day: the next could come any day from [from] to [to]. The calendar
+     * shows it on [from], an early guess that may well be too early.
+     */
+    data class Between(val shortest: Int, val longest: Int, val from: LocalDate, val to: LocalDate) : ReleasePattern
 }
+
+/** The time of day a novel's chapters come out, in this device's time zone: about one time, or within a window. */
+sealed interface ReleaseTime {
+    data class At(val time: LocalTime) : ReleaseTime
+
+    data class Window(val from: LocalTime, val to: LocalTime) : ReleaseTime
+}
+
+/** Whether the site dates enough of a novel's [chapters] ([dated] of them) for its dates to go by. */
+fun siteDated(chapters: Int, dated: Int): Boolean = dated > 0 && dated >= chapters * DATED_SHARE
 
 /**
  * The days [chapters] came out: as the site dates them, or, most of them undated, the days this device first saw them
@@ -39,14 +57,45 @@ fun releaseDays(chapters: List<Chapter>, zone: ZoneId): List<LocalDate> {
  * the ones that came with the novel when it was added, first of all at [firstAdded].
  */
 fun releaseTimes(chapters: Int, dated: Int, firstAdded: Long?, published: List<Long>, added: List<Long>): List<Long> {
-    if (dated > 0 && dated >= chapters * DATED_SHARE) return published
+    if (siteDated(chapters, dated)) return published
     val first = firstAdded ?: return emptyList()
     return added.filter { it > first + FIRST_BATCH_MS }
 }
 
+/** The time of day [chapters] come out, from the site's own times; null when the site gives none. */
+fun releaseTime(chapters: List<Chapter>, zone: ZoneId): ReleaseTime? {
+    val dated = chapters.mapNotNull { it.publishedAt }
+    return if (siteDated(chapters.size, dated.size)) releaseTime(dated, zone) else null
+}
+
+/**
+ * The time of day [times] (the site's own) fall at, going by the last eight weeks': about one time when three in four
+ * of them are within half an hour of one another, a window when they're within four hours, else null. Null too when
+ * the site gives dates without a time (most of them at midnight UTC), or there are too few to go by. When this device
+ * first saw a chapter says nothing of its time: it saw it at its next check for new chapters.
+ */
+fun releaseTime(times: Collection<Long>, zone: ZoneId): ReleaseTime? {
+    val last = times.maxOrNull() ?: return null
+    val recent = times.filter { it > last - WINDOW_DAYS * DAY_MS }
+    if (recent.size < MIN_RELEASES) return null
+    if (recent.count { it % DAY_MS == 0L } * 2 >= recent.size) return null
+    val minutes = recent.map { Instant.ofEpochMilli(it).atZone(zone).toLocalTime().let { time -> time.hour * 60 + time.minute } }.sorted()
+    val need = ceil(minutes.size * TIME_SHARE).toInt()
+    // Round the clock, as a window may run past midnight: the shortest that holds three in four of them.
+    val around = minutes + minutes.map { it + MINUTES_A_DAY }
+    val start = minutes.indices.minBy { around[it + need - 1] - around[it] }
+    val width = around[start + need - 1] - around[start]
+    return when {
+        width <= STEADY_MINUTES -> ReleaseTime.At(clockTime(roundTo(around[start + (need - 1) / 2], 5)))
+        width <= WINDOW_MINUTES -> ReleaseTime.Window(clockTime(around[start] / 30 * 30), clockTime((around[start + need - 1] + 29) / 30 * 30))
+        else -> null
+    }
+}
+
 /**
  * The pattern in the [days] chapters came out, as of [today]: the days of the week most weeks have one on, most days,
- * or every so many days. Null without a pattern clear enough to go by, or when the last chapter is long past due.
+ * every so many days, or every so many to so many days. Null without a pattern clear enough to go by, or when the last
+ * chapter is long past due.
  */
 fun releasePattern(days: Collection<LocalDate>, today: LocalDate): ReleasePattern? {
     val all = days.toSortedSet()
@@ -74,16 +123,64 @@ fun releasePattern(days: Collection<LocalDate>, today: LocalDate): ReleasePatter
             return ReleasePattern.Every(typical, maxOf(last.plusDays(typical.toLong()), today))
         }
     }
+    // On no set day, but three in four of the gaps within a few days of one another: the next any day in that window.
+    val need = ceil(gaps.size * BETWEEN_SHARE).toInt()
+    val sorted = gaps.sorted()
+    val start = (0..sorted.size - need).minBy { sorted[it + need - 1] - sorted[it] }
+    val shortest = sorted[start]
+    val longest = sorted[start + need - 1]
+    if (longest > shortest && longest <= shortest * 3 && longest - shortest <= MAX_WINDOW_DAYS) {
+        val from = maxOf(last.plusDays(shortest.toLong()), today)
+        return ReleasePattern.Between(shortest, longest, from, maxOf(last.plusDays(longest.toLong()), from))
+    }
     return null
 }
 
-/** The pattern in words, for under the novel's status: "New chapters usually Mon and Thu", then on a line of its own "Next about Thursday". */
-fun releaseText(pattern: ReleasePattern, today: LocalDate, locale: Locale = Locale.getDefault()): String =
-    when (pattern) {
-        ReleasePattern.MostDays -> "New chapters most days"
-        is ReleasePattern.Weekdays -> "New chapters usually ${weekdays(pattern.days, locale)}\nNext ${whenDue(pattern.next, today, locale)}"
-        is ReleasePattern.Every -> "New chapters about ${every(pattern.days)}\nNext ${whenDue(pattern.next, today, locale)}"
+/**
+ * The pattern in words, for under the novel's status: "New chapters usually Mon and Thu, around 6 PM", then on a line of
+ * its own "Next about Thursday". With no set day, the window: "Next between Monday and Friday, Monday at the earliest".
+ */
+fun releaseText(
+    pattern: ReleasePattern,
+    today: LocalDate,
+    locale: Locale = Locale.getDefault(),
+    time: ReleaseTime? = null,
+    is24Hour: Boolean = false,
+): String {
+    val at = time?.let { ", " + timeText(it, is24Hour) }.orEmpty()
+    return when (pattern) {
+        ReleasePattern.MostDays -> "New chapters most days$at"
+        is ReleasePattern.Weekdays -> "New chapters usually ${weekdays(pattern.days, locale)}$at\nNext ${whenDue(pattern.next, today, locale)}"
+        is ReleasePattern.Every -> "New chapters about ${every(pattern.days)}$at\nNext ${whenDue(pattern.next, today, locale)}"
+        is ReleasePattern.Between ->
+            "New chapters every ${pattern.shortest} to ${pattern.longest} days, no set day$at\nNext ${nextBetween(pattern, today, locale)}"
     }
+}
+
+/** The time of day in words: "around 6 PM", "between 2 and 5 PM", "between 11 PM and 1 AM"; on a 24-hour clock "around 18:00". */
+fun timeText(time: ReleaseTime, is24Hour: Boolean = false): String =
+    when (time) {
+        is ReleaseTime.At -> "around ${clockText(time.time, is24Hour, meridiem = true)}"
+        is ReleaseTime.Window -> {
+            // "2 and 5 PM" on the same side of noon; else each with its own.
+            val sameHalf = !is24Hour && (time.from.hour < 12) == (time.to.hour < 12)
+            "between ${clockText(time.from, is24Hour, meridiem = !sameHalf)} and ${clockText(time.to, is24Hour, meridiem = true)}"
+        }
+    }
+
+/**
+ * For a list, the days a novel with no set day could have its next chapter: "could be Mon to Fri", "could be today, or
+ * as late as Fri"; with the dates when the window is a week or more long.
+ */
+fun windowText(pattern: ReleasePattern.Between, today: LocalDate, locale: Locale = Locale.getDefault()): String {
+    val dated = ChronoUnit.DAYS.between(pattern.from, pattern.to) >= 6
+    fun day(date: LocalDate) = date.dayOfWeek.getDisplayName(TextStyle.SHORT, locale) + if (dated) " ${date.dayOfMonth}" else ""
+    return when {
+        pattern.from == pattern.to -> "could be ${if (pattern.from == today) "today" else day(pattern.from)}"
+        pattern.from == today -> "could be today, or as late as ${day(pattern.to)}"
+        else -> "could be ${day(pattern.from)} to ${day(pattern.to)}"
+    }
+}
 
 /** The pattern alone, for a list of novels: "Mon, Wed and Fri", "Fridays", "Every 3 days", "Most days". */
 fun patternText(pattern: ReleasePattern, locale: Locale = Locale.getDefault()): String =
@@ -92,15 +189,48 @@ fun patternText(pattern: ReleasePattern, locale: Locale = Locale.getDefault()): 
         is ReleasePattern.Weekdays ->
             if (pattern.days.size == 1) "${pattern.days.single().getDisplayName(TextStyle.FULL, locale)}s" else weekdays(pattern.days, locale)
         is ReleasePattern.Every -> every(pattern.days).replaceFirstChar { it.uppercase() }
+        is ReleasePattern.Between -> "Every ${pattern.shortest} to ${pattern.longest} days"
     }
 
-/** Whether a novel with this pattern has a chapter due on [day]. */
+/** Whether a novel with this pattern has a chapter due on [day]; one with no set day only on its earliest. */
 fun ReleasePattern.dueOn(day: LocalDate): Boolean =
     when (this) {
         ReleasePattern.MostDays -> true
         is ReleasePattern.Weekdays -> day.dayOfWeek in days
         is ReleasePattern.Every -> !day.isBefore(next) && ChronoUnit.DAYS.between(next, day) % days == 0L
+        is ReleasePattern.Between -> day == from
     }
+
+/** The next chapter's window in words: "between Monday and Friday, Monday at the earliest". */
+private fun nextBetween(pattern: ReleasePattern.Between, today: LocalDate, locale: Locale): String {
+    fun day(date: LocalDate): String {
+        val away = ChronoUnit.DAYS.between(today, date)
+        return when {
+            away <= 0 -> "today"
+            away == 1L -> "tomorrow"
+            away < 7 -> date.dayOfWeek.getDisplayName(TextStyle.FULL, locale)
+            else -> date.format(DateTimeFormatter.ofPattern("d MMM", locale))
+        }
+    }
+    return when {
+        pattern.from == pattern.to -> whenDue(pattern.from, today, locale)
+        pattern.from == today -> "could be today, or as late as ${day(pattern.to)}"
+        else -> "between ${day(pattern.from)} and ${day(pattern.to)}, ${day(pattern.from)} at the earliest"
+    }
+}
+
+/** A time of day: "6 PM", "6:30 PM", or without the AM/PM; "18:00" on a 24-hour clock. */
+private fun clockText(time: LocalTime, is24Hour: Boolean, meridiem: Boolean): String {
+    if (is24Hour) return "%02d:%02d".format(time.hour, time.minute)
+    val hour = (time.hour + 11) % 12 + 1
+    val clock = if (time.minute == 0) "$hour" else "$hour:%02d".format(time.minute)
+    return if (meridiem) "$clock ${if (time.hour < 12) "AM" else "PM"}" else clock
+}
+
+/** [minutes] into a day (or past it) as a time of day. */
+private fun clockTime(minutes: Int): LocalTime = LocalTime.of(Math.floorMod(minutes, MINUTES_A_DAY) / 60, Math.floorMod(minutes, MINUTES_A_DAY) % 60)
+
+private fun roundTo(minutes: Int, step: Int): Int = (minutes + step / 2) / step * step
 
 private fun weekdays(days: List<DayOfWeek>, locale: Locale): String =
     if (days.size == 1) {
@@ -166,3 +296,15 @@ private const val MAX_WEEKDAYS = 4
 
 /** This share of the gaps must be about the usual one for "every so many days". */
 private const val STEADY_SHARE = 0.7
+
+/** For "every so many to so many days": this share of the gaps within a window of at most so many days. */
+private const val BETWEEN_SHARE = 0.75
+private const val MAX_WINDOW_DAYS = 7
+
+/** A time of day when this share of the chapters came out within [STEADY_MINUTES] of one another, a window within [WINDOW_MINUTES]. */
+private const val TIME_SHARE = 0.75
+private const val STEADY_MINUTES = 30
+private const val WINDOW_MINUTES = 240
+
+private const val MINUTES_A_DAY = 24 * 60
+private const val DAY_MS = 24 * 60 * 60 * 1000L

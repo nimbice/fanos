@@ -22,13 +22,26 @@ import io.github.nimbice.fanos.core.designsystem.component.LoadingState
 import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
+import android.text.format.DateFormat
+import androidx.compose.ui.platform.LocalContext
+import io.github.nimbice.fanos.core.data.release.ReleaseTime
+import io.github.nimbice.fanos.core.data.release.timeText
+import io.github.nimbice.fanos.core.data.release.windowText
 
-/** A library novel in the week's calendar: when its chapters usually come out, and whether today's is out yet. */
-data class CalendarNovel(val novelId: Long, val title: String, val coverUrl: String?, val pattern: ReleasePattern, val outToday: Boolean)
+/** A library novel in the week's calendar: when its chapters usually come out (the time of day too, when known), and whether today's is out yet. */
+data class CalendarNovel(
+    val novelId: Long,
+    val title: String,
+    val coverUrl: String?,
+    val pattern: ReleasePattern,
+    val outToday: Boolean,
+    val time: ReleaseTime? = null,
+)
 
 /**
  * This week: today's novels, then the ones with chapters out most days, then the days ahead, each with the library
- * novels that usually have a chapter out on it. Today's (and most days') say whether it's out yet; a tap opens the novel.
+ * novels that usually have a chapter out on it. Today's (and most days') say whether it's out yet; a novel with no set
+ * day shows on the first day its next could come, marked as an early guess. A tap opens the novel.
  */
 @Composable
 internal fun ReleaseCalendarPane(novels: List<CalendarNovel>?, onOpenNovel: (Long) -> Unit) {
@@ -45,22 +58,31 @@ internal fun ReleaseCalendarPane(novels: List<CalendarNovel>?, onOpenNovel: (Lon
                     .filter { (_, due) -> due.isNotEmpty() }
             // Today's own first: what's due now shouldn't wait below the many that come out most days.
             val (todays, ahead) = week.partition { (day, _) -> day == today }
+            val shown = week.flatMap { (_, due) -> due } + mostDays
+            val is24Hour = DateFormat.is24HourFormat(LocalContext.current)
             LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
                 todays.forEach { (day, due) ->
                     item(key = "day $day") { CalendarHeading(calendarDay(day, today)) }
-                    items(due, key = { "$day ${it.novelId}" }) { CalendarRow(it, today = true, onOpenNovel) }
+                    items(due, key = { "$day ${it.novelId}" }) { CalendarRow(it, today = true, now = today, is24Hour, onOpenNovel) }
                 }
                 if (mostDays.isNotEmpty()) {
                     item(key = "most") { CalendarHeading("Most days") }
-                    items(mostDays, key = { "most ${it.novelId}" }) { CalendarRow(it, today = true, onOpenNovel) }
+                    items(mostDays, key = { "most ${it.novelId}" }) { CalendarRow(it, today = true, now = today, is24Hour, onOpenNovel) }
                 }
                 ahead.forEach { (day, due) ->
                     item(key = "day $day") { CalendarHeading(calendarDay(day, today)) }
-                    items(due, key = { "$day ${it.novelId}" }) { CalendarRow(it, today = day == today, onOpenNovel) }
+                    items(due, key = { "$day ${it.novelId}" }) { CalendarRow(it, today = day == today, now = today, is24Hour, onOpenNovel) }
                 }
                 item(key = "foot") {
+                    val notes =
+                        listOfNotNull(
+                            "Early guess: a novel with no set day shows on the first day its next chapter could come. It may well come later."
+                                .takeIf { shown.any { it.pattern is ReleasePattern.Between } },
+                            "Times are your local time, for sites that give them.".takeIf { shown.any { it.time != null } },
+                            "Novels with no clear pattern yet aren't shown.",
+                        )
                     Text(
-                        "Novels with no clear pattern yet aren't shown.",
+                        notes.joinToString("\n"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
@@ -81,18 +103,40 @@ private fun CalendarHeading(text: String) {
     )
 }
 
-/** A novel under its day: its cover, title and pattern; on today's, whether the chapter's out yet. */
+/**
+ * A novel under its day: its cover, title, pattern and time of day; on today's, whether the chapter's out yet. One with no
+ * set day says which days its next could come, and that the day it's under is an early guess.
+ */
 @Composable
-private fun CalendarRow(novel: CalendarNovel, today: Boolean, onOpenNovel: (Long) -> Unit) {
+private fun CalendarRow(novel: CalendarNovel, today: Boolean, now: LocalDate, is24Hour: Boolean, onOpenNovel: (Long) -> Unit) {
+    val pattern = novel.pattern
+    val line =
+        listOfNotNull(
+            // Under "Most days", saying so again would add nothing.
+            patternText(pattern).takeIf { pattern != ReleasePattern.MostDays },
+            (pattern as? ReleasePattern.Between)?.let { windowText(it, now) },
+            novel.time?.let { timeText(it, is24Hour) },
+        ).joinToString(" · ").replaceFirstChar { it.uppercase() }
     RecentRow(
         coverUrl = novel.coverUrl,
         title = novel.title,
-        // Under "Most days", saying so again would add nothing.
-        line = if (novel.pattern == ReleasePattern.MostDays) "" else patternText(novel.pattern),
+        line = line,
         faded = false,
         onClick = { onOpenNovel(novel.novelId) },
     ) {
-        if (today) {
+        if (pattern is ReleasePattern.Between) {
+            Text(
+                "Early guess",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                modifier =
+                    Modifier
+                        .padding(end = 12.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.tertiaryContainer)
+                        .padding(horizontal = 8.dp, vertical = 3.dp),
+            )
+        } else if (today) {
             val out = novel.outToday
             Text(
                 if (out) "Out" else "Not yet",

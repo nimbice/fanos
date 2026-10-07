@@ -19,6 +19,9 @@ import io.github.nimbice.fanos.core.model.NovelStatus
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import io.github.nimbice.fanos.core.data.release.ReleaseTime
+import io.github.nimbice.fanos.core.data.release.releaseTime
+import io.github.nimbice.fanos.core.data.release.siteDated
 
 /** What came in lately (chapters that arrived in library novels) and what was read lately (the novels read, last first). */
 @Singleton
@@ -39,7 +42,10 @@ class RecentRepository @Inject constructor(
             rows.map { HistoryEntry(it.novelId, it.novelTitle, it.coverUrl, it.inLibrary, it.lastReadAt, it.chapterId, it.chapterTitle) }
         }
 
-    /** Library novels still coming out, with the days their chapters came out of late: when new ones usually do. */
+    /**
+     * Library novels still coming out, with the days their chapters came out of late (when new ones usually do), and the
+     * time of day they do when the site gives its own times.
+     */
     suspend fun releaseDays(zone: ZoneId): List<NovelReleaseDays> {
         val since = clock.now() - RELEASE_HISTORY_MS
         val times = chapters.releaseTimes(since).groupBy { it.novelId }
@@ -49,7 +55,8 @@ class RecentRepository @Inject constructor(
                 val rows = times[novel.novelId] ?: return@mapNotNull null
                 val published = rows.mapNotNull { it.publishedAt }.filter { it >= since }
                 val chosen = releaseTimes(novel.chapters, novel.dated, novel.firstAddedAt, published, rows.map { it.addedAt })
-                NovelReleaseDays(novel.novelId, novel.novelTitle, novel.coverUrl, chosen.map { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() })
+                val time = if (siteDated(novel.chapters, novel.dated)) releaseTime(published, zone) else null
+                NovelReleaseDays(novel.novelId, novel.novelTitle, novel.coverUrl, chosen.map { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() }, time)
             }
     }
 
@@ -88,7 +95,7 @@ class RecentRepository @Inject constructor(
 }
 
 /** A library novel, and the days its chapters came out of late. */
-data class NovelReleaseDays(val novelId: Long, val title: String, val coverUrl: String?, val days: List<LocalDate>)
+data class NovelReleaseDays(val novelId: Long, val title: String, val coverUrl: String?, val days: List<LocalDate>, val time: ReleaseTime? = null)
 
 /** How far back the chapters' dates are looked at for when new ones usually come out: more than the eight weeks used. */
 private const val RELEASE_HISTORY_MS = 120L * 24 * 60 * 60 * 1000
