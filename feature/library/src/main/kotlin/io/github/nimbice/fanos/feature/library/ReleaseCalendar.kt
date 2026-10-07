@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.LocalContext
 import io.github.nimbice.fanos.core.data.release.ReleaseTime
 import io.github.nimbice.fanos.core.data.release.timeText
 import io.github.nimbice.fanos.core.data.release.windowText
+import io.github.nimbice.fanos.core.data.release.perDayText
 
 /** A library novel in the week's calendar: when its chapters usually come out (the time of day too, when known), and whether today's is out yet. */
 data class CalendarNovel(
@@ -36,6 +37,8 @@ data class CalendarNovel(
     val pattern: ReleasePattern,
     val outToday: Boolean,
     val time: ReleaseTime? = null,
+    /** How many chapters come out at once; 1 for one. */
+    val perDay: Int = 1,
 )
 
 /**
@@ -51,10 +54,11 @@ internal fun ReleaseCalendarPane(novels: List<CalendarNovel>?, onOpenNovel: (Lon
             EmptyState("No patterns yet", "When library novels' new chapters usually come out shows here, once there are a few weeks to go by.")
         else -> {
             val today = LocalDate.now()
-            val mostDays = novels.filter { it.pattern == ReleasePattern.MostDays }
+            // Out every day or most days: one list after today's, every day first.
+            val mostDays = novels.filter { it.pattern is ReleasePattern.MostDays }.sortedByDescending { (it.pattern as ReleasePattern.MostDays).everyDay }
             val week =
                 (0L until DAYS_SHOWN).map { today.plusDays(it) }
-                    .map { day -> day to novels.filter { it.pattern != ReleasePattern.MostDays && it.pattern.dueOn(day) } }
+                    .map { day -> day to novels.filter { it.pattern !is ReleasePattern.MostDays && it.pattern.dueOn(day) } }
                     .filter { (_, due) -> due.isNotEmpty() }
             // Today's own first: what's due now shouldn't wait below the many that come out most days.
             val (todays, ahead) = week.partition { (day, _) -> day == today }
@@ -66,7 +70,7 @@ internal fun ReleaseCalendarPane(novels: List<CalendarNovel>?, onOpenNovel: (Lon
                     items(due, key = { "$day ${it.novelId}" }) { CalendarRow(it, today = true, now = today, is24Hour, onOpenNovel) }
                 }
                 if (mostDays.isNotEmpty()) {
-                    item(key = "most") { CalendarHeading("Most days") }
+                    item(key = "most") { CalendarHeading("Daily") }
                     items(mostDays, key = { "most ${it.novelId}" }) { CalendarRow(it, today = true, now = today, is24Hour, onOpenNovel) }
                 }
                 ahead.forEach { (day, due) ->
@@ -112,8 +116,8 @@ private fun CalendarRow(novel: CalendarNovel, today: Boolean, now: LocalDate, is
     val pattern = novel.pattern
     val line =
         listOfNotNull(
-            // Under "Most days", saying so again would add nothing.
-            patternText(pattern).takeIf { pattern != ReleasePattern.MostDays },
+            patternText(pattern),
+            perDayText(pattern, novel.perDay),
             (pattern as? ReleasePattern.Between)?.let { windowText(it, now) },
             novel.time?.let { timeText(it, is24Hour) },
         ).joinToString(" · ").replaceFirstChar { it.uppercase() }

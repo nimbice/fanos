@@ -40,7 +40,7 @@ class ReleasePatternTest {
     @Test
     fun `most days, and every so many days`() {
         val weekdays = days(LocalDate.of(2026, 8, 10), LocalDate.of(2026, 9, 30), *DayOfWeek.entries.take(5).toTypedArray())
-        assertEquals(ReleasePattern.MostDays, releasePattern(weekdays, today))
+        assertEquals(ReleasePattern.MostDays(), releasePattern(weekdays, today))
         val everyThird = generateSequence(LocalDate.of(2026, 8, 6)) { it.plusDays(3) }.takeWhile { it <= LocalDate.of(2026, 9, 29) }.toList()
         assertEquals(ReleasePattern.Every(3, LocalDate.of(2026, 10, 2)), releasePattern(everyThird, today))
         assertEquals("New chapters about every 3 days\nNext about tomorrow", releaseText(ReleasePattern.Every(3, LocalDate.of(2026, 10, 2)), today, Locale.ENGLISH))
@@ -75,7 +75,8 @@ class ReleasePatternTest {
         assertEquals("Mon and Thu", patternText(weekly, Locale.ENGLISH))
         assertEquals("Fridays", patternText(ReleasePattern.Weekdays(listOf(DayOfWeek.FRIDAY), today), Locale.ENGLISH))
         assertEquals("Every 3 days", patternText(every3, Locale.ENGLISH))
-        assertEquals("Most days", patternText(ReleasePattern.MostDays, Locale.ENGLISH))
+        assertEquals("Most days", patternText(ReleasePattern.MostDays(), Locale.ENGLISH))
+        assertEquals("Every day", patternText(ReleasePattern.MostDays(everyDay = true), Locale.ENGLISH))
     }
 
     @Test
@@ -102,6 +103,33 @@ class ReleasePatternTest {
             "New chapters every 6 to 9 days, no set day, around 6 PM\nNext could be today, or as late as Wednesday",
             releaseText(now, sunday, Locale.ENGLISH, time = ReleaseTime.At(LocalTime.of(18, 0))),
         )
+    }
+
+    @Test
+    fun `a novel out every day shows after a week, with its chapters a day`() {
+        // Two chapters a day, first seen a little over a week ago (a novel only just added, its site giving no dates).
+        val days = (0L..8L).flatMap { listOf(LocalDate.of(2026, 9, 22).plusDays(it), LocalDate.of(2026, 9, 22).plusDays(it)) }
+        val pattern = releasePattern(days, today)
+        assertEquals(ReleasePattern.MostDays(everyDay = true), pattern)
+        assertEquals(2, chaptersPerDay(days))
+        assertEquals("2 chapters a day", perDayText(pattern!!, 2))
+        assertEquals(
+            "New chapters every day, 2 a day, around 6 PM",
+            releaseText(pattern, today, Locale.ENGLISH, time = ReleaseTime.At(LocalTime.of(18, 0)), perDay = 2),
+        )
+        // Two at a time on set days.
+        assertEquals("2 chapters at a time", perDayText(ReleasePattern.Weekdays(listOf(DayOfWeek.MONDAY), today), 2))
+        assertNull(perDayText(pattern, 1))
+        // A few days are not enough to go by.
+        assertNull(releasePattern(days.take(8), today))
+    }
+
+    @Test
+    fun `semi-regular chapters, a day or two apart now and then`() {
+        val days = listOf(1, 3, 1, 5, 2, 4, 1, 4, 3).runningFold(LocalDate.of(2026, 9, 3)) { day, gap -> day.plusDays(gap.toLong()) }
+        // The last on 27 September; on 28 September the next could be any day to 2 October.
+        val pattern = releasePattern(days, LocalDate.of(2026, 9, 28))
+        assertEquals(ReleasePattern.Between(1, 4, LocalDate.of(2026, 9, 28), LocalDate.of(2026, 10, 1)), pattern)
     }
 
     @Test

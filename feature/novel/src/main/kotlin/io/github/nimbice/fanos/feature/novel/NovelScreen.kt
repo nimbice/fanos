@@ -135,6 +135,7 @@ import io.github.nimbice.fanos.core.designsystem.component.FittingText
 import androidx.compose.material3.HorizontalDivider
 import io.github.nimbice.fanos.core.data.release.releaseTime
 import androidx.compose.ui.platform.LocalContext
+import io.github.nimbice.fanos.core.data.release.chaptersPerDay
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -173,8 +174,12 @@ fun NovelScreen(
             val today = LocalDate.now()
             val zone = ZoneId.systemDefault()
             novel?.takeIf { it.status == NovelStatus.Ongoing || it.status == NovelStatus.Unknown }
-                ?.let { releasePattern(releaseDays(state.chapters, zone), today) }
-                ?.let { releaseText(it, today, time = releaseTime(state.chapters, zone), is24Hour = is24Hour) }
+                ?.let { releaseDays(state.chapters, zone) }
+                ?.let { days ->
+                    releasePattern(days, today)?.let {
+                        releaseText(it, today, time = releaseTime(state.chapters, zone), is24Hour = is24Hour, perDay = chaptersPerDay(days))
+                    }
+                }
         }
 
     // The chapter tools: a search (a number goes to that chapter, words find titles), filters, and chapters selected.

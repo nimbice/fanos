@@ -98,6 +98,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import androidx.compose.foundation.layout.BoxWithConstraints
 import io.github.nimbice.fanos.core.designsystem.component.fittingStyle
+import io.github.nimbice.fanos.core.data.release.chaptersPerDay
 
 /** The Updates tab: what came in lately and what was read lately. Set [SHOW_NEW_CHAPTERS] true in its saved state to open it on the new chapters. */
 @Serializable
@@ -133,7 +134,9 @@ class RecentViewModel @Inject constructor(
             _calendar.value =
                 recent.releaseDays(ZoneId.systemDefault())
                     .mapNotNull { novel ->
-                        releasePattern(novel.days, today)?.let { CalendarNovel(novel.novelId, novel.title, novel.coverUrl, it, today in novel.days, novel.time) }
+                        releasePattern(novel.days, today)?.let {
+                            CalendarNovel(novel.novelId, novel.title, novel.coverUrl, it, today in novel.days, novel.time, chaptersPerDay(novel.days))
+                        }
                     }
                     .sortedBy { it.title.lowercase() }
         }
