@@ -35,7 +35,8 @@ sealed interface ReleasePattern {
 sealed interface ReleaseTime {
     data class At(val time: LocalTime) : ReleaseTime
 
-    data class Window(val from: LocalTime, val to: LocalTime) : ReleaseTime
+    /** Within a window; [estimated] when worked out from this device's checks for new chapters, not the site's times. */
+    data class Window(val from: LocalTime, val to: LocalTime, val estimated: Boolean = false) : ReleaseTime
 }
 
 /** Whether the site dates enough of a novel's [chapters] ([dated] of them) for its dates to go by. */
@@ -62,10 +63,47 @@ fun releaseTimes(chapters: Int, dated: Int, firstAdded: Long?, published: List<L
     return added.filter { it > first + FIRST_BATCH_MS }
 }
 
-/** The time of day [chapters] come out, from the site's own times; null when the site gives none. */
+/**
+ * The time of day [chapters] come out: from the site's own times, or, when it gives none, estimated from when this
+ * device's checks found them.
+ */
 fun releaseTime(chapters: List<Chapter>, zone: ZoneId): ReleaseTime? {
     val dated = chapters.mapNotNull { it.publishedAt }
-    return if (siteDated(chapters.size, dated.size)) releaseTime(dated, zone) else null
+    if (siteDated(chapters.size, dated.size)) return releaseTime(dated, zone)
+    return estimatedReleaseTime(chapters.mapNotNull { chapter -> chapter.seenAfter?.let { after -> chapter.addedAt?.let { after to it } } }, zone)
+}
+
+/**
+ * The time of day chapters come out, estimated from [windows]: for each, the check that didn't find a chapter and the one
+ * that did, so it came out in between. Where the most of the last eight weeks' windows overlap, round the clock (three
+ * in four of them at least), is when they usually come out, given as a window once that's within four hours. Null when there are too few windows
+ * narrow enough to go by, or they don't agree. Chapters found together count once.
+ */
+fun estimatedReleaseTime(windows: Collection<Pair<Long, Long>>, zone: ZoneId): ReleaseTime? {
+    val last = windows.maxOfOrNull { it.second } ?: return null
+    val usable = windows.distinct().filter { (after, at) -> at > after && at - after <= MAX_CHECK_GAP_MS && at > last - WINDOW_DAYS * DAY_MS }
+    if (usable.size < MIN_ESTIMATES) return null
+    val counts = IntArray(MINUTES_A_DAY)
+    for ((after, at) in usable) {
+        val start = Instant.ofEpochMilli(after).atZone(zone).toLocalTime().let { it.hour * 60 + it.minute }
+        val length = ((at - after) / 60_000).toInt().coerceAtLeast(1)
+        for (m in 0 until length) counts[(start + m) % MINUTES_A_DAY]++
+    }
+    // The minutes the most windows share, three in four of them at least, as one run round the clock; two apart, or
+    // none, and it can't be told.
+    val most = counts.max()
+    if (most < ceil(usable.size * TIME_SHARE).toInt()) return null
+    val agreed = (0 until MINUTES_A_DAY).map { counts[it] == most }
+    if (agreed.none { it } || agreed.all { it }) return null
+    val starts = (0 until MINUTES_A_DAY).filter { agreed[it] && !agreed[(it + MINUTES_A_DAY - 1) % MINUTES_A_DAY] }
+    if (starts.size != 1) return null
+    val from = starts.single()
+    var width = 0
+    while (agreed[(from + width) % MINUTES_A_DAY]) width++
+    if (width > WINDOW_MINUTES) return null
+    val start = from / 30 * 30
+    val end = maxOf((from + width + 29) / 30 * 30, start + 30)
+    return ReleaseTime.Window(clockTime(start), clockTime(end), estimated = true)
 }
 
 /**
@@ -185,7 +223,8 @@ fun timeText(time: ReleaseTime, is24Hour: Boolean = false): String =
         is ReleaseTime.Window -> {
             // "2 and 5 PM" on the same side of noon; else each with its own.
             val sameHalf = !is24Hour && (time.from.hour < 12) == (time.to.hour < 12)
-            "between ${clockText(time.from, is24Hour, meridiem = !sameHalf)} and ${clockText(time.to, is24Hour, meridiem = true)}"
+            val between = "between ${clockText(time.from, is24Hour, meridiem = !sameHalf)} and ${clockText(time.to, is24Hour, meridiem = true)}"
+            if (time.estimated) "likely $between" else between
         }
     }
 
@@ -331,6 +370,10 @@ private const val MAX_WINDOW_DAYS = 6
 private const val TIME_SHARE = 0.75
 private const val STEADY_MINUTES = 30
 private const val WINDOW_MINUTES = 240
+
+/** Checks for an estimate: at least this many, each pair of checks at most so far apart. */
+private const val MIN_ESTIMATES = 4
+private const val MAX_CHECK_GAP_MS = 12 * 60 * 60 * 1000L
 
 private const val MINUTES_A_DAY = 24 * 60
 private const val DAY_MS = 24 * 60 * 60 * 1000L

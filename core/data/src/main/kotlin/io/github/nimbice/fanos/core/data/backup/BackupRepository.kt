@@ -580,6 +580,7 @@ private fun NovelEntity.toBackup(
                     readAt = chapter.readAt,
                     removedAt = chapter.removedAt,
                     addedAt = chapter.addedAt,
+                    seenAfter = chapter.seenAfter,
                     progress = positions[chapter.id]?.let { BackupProgress(it.block, it.offset, it.updatedAt) },
                     bookmarks = bookmarks[chapter.id].orEmpty().map { BackupBookmark(it.block, it.snippet, it.createdAt) },
                     highlights = highlights[chapter.id].orEmpty().map { BackupHighlight(it.block, it.start, it.end, it.text, it.color, it.note, it.createdAt, maxOf(it.block, it.endBlock)) },
@@ -623,6 +624,7 @@ private fun BackupChapter.toEntity(novelId: Long, now: Long) =
         readAt = readAt,
         removedAt = removedAt,
         addedAt = addedAt ?: now,
+        seenAfter = seenAfter.takeIf { addedAt != null },
         group = group,
     )
 

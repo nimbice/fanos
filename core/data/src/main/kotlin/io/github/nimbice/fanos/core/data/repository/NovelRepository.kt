@@ -144,6 +144,8 @@ class NovelRepository @Inject constructor(
                             sourceIndex = index,
                             publishedAt = chapter.publishedAt,
                             addedAt = now,
+                            // It came out after the last fetch that didn't list it: between then and now.
+                            seenAfter = novel.chaptersFetchedAt,
                             locked = chapter.locked,
                             group = chapter.group,
                         )

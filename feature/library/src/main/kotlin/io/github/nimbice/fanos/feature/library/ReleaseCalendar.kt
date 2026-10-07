@@ -82,7 +82,9 @@ internal fun ReleaseCalendarPane(novels: List<CalendarNovel>?, onOpenNovel: (Lon
                         listOfNotNull(
                             "Early guess: a novel with no set day shows on the first day its next chapter could come. It may well come later."
                                 .takeIf { shown.any { it.pattern is ReleasePattern.Between } },
-                            "Times are your local time, for sites that give them.".takeIf { shown.any { it.time != null } },
+                            "Times are your local time. \u201CLikely\u201D ones are worked out from when Fanos found the chapters."
+                                .takeIf { shown.any { (it.time as? ReleaseTime.Window)?.estimated == true } }
+                                ?: "Times are your local time.".takeIf { shown.any { it.time != null } },
                             "Novels with no clear pattern yet aren't shown.",
                         )
                     Text(

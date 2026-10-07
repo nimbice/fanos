@@ -313,7 +313,7 @@ interface ChapterDao {
 
     /** Library novels' chapters dated, or first seen, since [since]. */
     @Query(
-        """SELECT c.novel_id, c.published_at, c.added_at FROM chapters c JOIN novels n ON n.id = c.novel_id
+        """SELECT c.novel_id, c.published_at, c.added_at, c.seen_after FROM chapters c JOIN novels n ON n.id = c.novel_id
            WHERE n.in_library = 1 AND (c.published_at >= :since OR c.added_at >= :since)""",
     )
     suspend fun releaseTimes(since: Long): List<ReleaseTimeRow>

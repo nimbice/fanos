@@ -155,6 +155,30 @@ class ReleasePatternTest {
     }
 
     @Test
+    fun `the time of day estimated from checks, for sites that give no times`() {
+        val zone = ZoneOffset.UTC
+        fun at(day: Int, hour: Int, minute: Int) = LocalDate.of(2026, 9, 1).plusDays(day.toLong()).atTime(hour, minute).toInstant(ZoneOffset.UTC).toEpochMilli()
+        // Out about 7:15 each day; checks every six hours or so, at different times, find it.
+        val windows =
+            listOf(
+                at(0, 4, 0) to at(0, 10, 0), at(1, 6, 30) to at(1, 12, 0), at(2, 2, 0) to at(2, 7, 40),
+                at(3, 5, 10) to at(3, 9, 0), at(4, 7, 0) to at(4, 11, 30), at(5, 1, 0) to at(5, 8, 0),
+            )
+        // All six windows share 7:00 to 7:40.
+        assertEquals(ReleaseTime.Window(LocalTime.of(7, 0), LocalTime.of(8, 0), estimated = true), estimatedReleaseTime(windows, zone))
+        assertEquals("likely between 7 and 8\u00A0AM", timeText(estimatedReleaseTime(windows, zone)!!))
+        // Two chapters found together count once; too few windows, or ones that don't agree, give nothing.
+        assertNull(estimatedReleaseTime(windows.take(3) + windows.take(3), zone))
+        val apart = listOf(at(0, 1, 0) to at(0, 3, 0), at(1, 9, 0) to at(1, 11, 0), at(2, 17, 0) to at(2, 19, 0), at(3, 21, 0) to at(3, 23, 0))
+        assertNull(estimatedReleaseTime(apart, zone))
+        // Checks too far apart say little.
+        assertNull(estimatedReleaseTime(List(6) { at(it, 0, 0) to at(it, 20, 0) }, zone))
+        // A novel's chapters: the site's times when it gives them, else the estimate.
+        fun chapter(id: Int, window: Pair<Long, Long>) = Chapter(id.toLong(), 1, "u$id", "C$id", id, publishedAt = null, addedAt = window.second, seenAfter = window.first)
+        assertEquals(estimatedReleaseTime(windows, zone), releaseTime(windows.mapIndexed { i, w -> chapter(i, w) }, zone))
+    }
+
+    @Test
     fun `times of day in words`() {
         assertEquals("around 6\u00A0PM", timeText(ReleaseTime.At(LocalTime.of(18, 0))))
         assertEquals("around 6:30\u00A0AM", timeText(ReleaseTime.At(LocalTime.of(6, 30))))

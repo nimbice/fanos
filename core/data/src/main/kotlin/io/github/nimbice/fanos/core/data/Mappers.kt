@@ -49,6 +49,7 @@ internal fun ChapterEntity.toModel() =
         locked = locked,
         group = group,
         addedAt = addedAt,
+        seenAfter = seenAfter,
     )
 
 internal fun LibraryNovelRow.toModel() =
