@@ -133,6 +133,8 @@ import io.github.nimbice.fanos.core.data.release.releasePattern
 import io.github.nimbice.fanos.core.data.release.releaseText
 import io.github.nimbice.fanos.core.designsystem.component.FittingText
 import androidx.compose.material3.HorizontalDivider
+import io.github.nimbice.fanos.core.data.release.releaseTime
+import androidx.compose.ui.platform.LocalContext
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -163,13 +165,16 @@ fun NovelScreen(
     val chapterSearches by viewModel.chapterSearches.items.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val novel = state.novel
-    // When new chapters come out, going by when the last few weeks' did: for a novel still coming out.
+    // When new chapters come out, going by when the last few weeks' did (the time of day too, from the site's own
+    // times): for a novel still coming out.
+    val is24Hour = android.text.format.DateFormat.is24HourFormat(LocalContext.current)
     val release =
-        remember(state.chapters, novel?.status) {
+        remember(state.chapters, novel?.status, is24Hour) {
             val today = LocalDate.now()
+            val zone = ZoneId.systemDefault()
             novel?.takeIf { it.status == NovelStatus.Ongoing || it.status == NovelStatus.Unknown }
-                ?.let { releasePattern(releaseDays(state.chapters, ZoneId.systemDefault()), today) }
-                ?.let { releaseText(it, today) }
+                ?.let { releasePattern(releaseDays(state.chapters, zone), today) }
+                ?.let { releaseText(it, today, time = releaseTime(state.chapters, zone), is24Hour = is24Hour) }
         }
 
     // The chapter tools: a search (a number goes to that chapter, words find titles), filters, and chapters selected.

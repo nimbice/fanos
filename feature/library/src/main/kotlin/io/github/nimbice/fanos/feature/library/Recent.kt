@@ -132,7 +132,9 @@ class RecentViewModel @Inject constructor(
             val today = LocalDate.now()
             _calendar.value =
                 recent.releaseDays(ZoneId.systemDefault())
-                    .mapNotNull { novel -> releasePattern(novel.days, today)?.let { CalendarNovel(novel.novelId, novel.title, novel.coverUrl, it, today in novel.days) } }
+                    .mapNotNull { novel ->
+                        releasePattern(novel.days, today)?.let { CalendarNovel(novel.novelId, novel.title, novel.coverUrl, it, today in novel.days, novel.time) }
+                    }
                     .sortedBy { it.title.lowercase() }
         }
     }
