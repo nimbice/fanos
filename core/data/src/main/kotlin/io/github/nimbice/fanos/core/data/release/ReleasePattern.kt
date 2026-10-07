@@ -245,7 +245,8 @@ private fun clockText(time: LocalTime, is24Hour: Boolean, meridiem: Boolean): St
     if (is24Hour) return "%02d:%02d".format(time.hour, time.minute)
     val hour = (time.hour + 11) % 12 + 1
     val clock = if (time.minute == 0) "$hour" else "$hour:%02d".format(time.minute)
-    return if (meridiem) "$clock ${if (time.hour < 12) "AM" else "PM"}" else clock
+    // A no-break space: "5:30 AM" never splits across lines.
+    return if (meridiem) "$clock\u00A0${if (time.hour < 12) "AM" else "PM"}" else clock
 }
 
 /** [minutes] into a day (or past it) as a time of day. */

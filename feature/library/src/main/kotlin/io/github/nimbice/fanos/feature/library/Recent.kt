@@ -505,6 +505,7 @@ internal fun RecentRow(
     onClick: () -> Unit,
     onHold: (() -> Unit)? = null,
     selected: Boolean = false,
+    lineMaxLines: Int = 2,
     trailing: @Composable () -> Unit,
 ) {
     val color = if (faded) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface
@@ -533,7 +534,7 @@ internal fun RecentRow(
                     line,
                     style = MaterialTheme.typography.bodySmall,
                     color = if (faded) color else MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
+                    maxLines = lineMaxLines,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
