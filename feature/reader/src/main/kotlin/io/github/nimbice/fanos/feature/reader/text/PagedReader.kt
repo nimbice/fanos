@@ -244,14 +244,22 @@ internal fun PagedReader(
         // While one is under way the pager can't be dragged: a touch would catch the sliding page and
         // stop it, and the tap meant to turn the next page would be lost.
         var turns by remember { mutableIntStateOf(0) }
-        val turningTo = remember { intArrayOf(0) }
+        val turningTo = remember { arrayOfNulls<String>(1) }
         // The page's fade, for pages that turn by fading.
         val shown = remember { Animatable(1f) }
 
-        /** Turns [delta] pages on from the page being turned to, so taps in quick succession each turn one. */
+        /** Where the turn keyed [key] is in the row of pages now; -1 once it's gone. */
+        fun indexOfTurn(key: String) = currentPages.indexOfFirst { it.key == key }
+
+        /**
+         * Turns [delta] pages on from the page being turned to, so taps in quick succession each turn one. The page is
+         * aimed at by its key, not its number: the chapter before coming in meanwhile (as it does a moment after a
+         * chapter opens on its own, from a notification say) puts its pages in front and moves every number on, and a
+         * turn to the old number would slide back through them all into that chapter.
+         */
         fun turn(delta: Int) {
-            val target = (if (turns > 0) turningTo[0] else pagerState.currentPage) + delta
-            if (target !in 0 until pagerState.pageCount) return
+            val from = turningTo[0]?.takeIf { turns > 0 }?.let { indexOfTurn(it) }?.takeIf { it >= 0 } ?: pagerState.currentPage
+            val target = currentPages.getOrNull(from + delta)?.key ?: return
             turningTo[0] = target
             turns++
             scope.launch {
@@ -259,12 +267,13 @@ internal fun PagedReader(
                     // The pager is locked on the next frame; the page moves only once it is, or a tap
                     // landing in between would still catch it.
                     withFrameNanos {}
+                    val at = indexOfTurn(target).takeIf { it >= 0 } ?: return@launch
                     when (currentSettings.pageTurn) {
-                        PageTurn.Slide -> pagerState.slideTo(target)
-                        PageTurn.Instant -> pagerState.scrollToPage(target)
+                        PageTurn.Slide -> pagerState.slideTo(at)
+                        PageTurn.Instant -> pagerState.scrollToPage(at)
                         PageTurn.Fade -> {
                             shown.animateTo(0f, FADE_OUT)
-                            pagerState.scrollToPage(target)
+                            indexOfTurn(target).takeIf { it >= 0 }?.let { pagerState.scrollToPage(it) }
                             shown.animateTo(1f, FADE_IN)
                         }
                     }
@@ -335,7 +344,10 @@ internal fun PagedReader(
                         settledKey[0]?.let { key -> list.indexOfFirst { it.key == key } } ?: -1
                     }
                 seenCut = cut ?: seenCut
-                if (target >= 0 && target != pagerState.settledPage && !pagerState.isScrollInProgress) {
+                if (pagerState.isScrollInProgress) {
+                    // A turn under way: the page it settles on is told of then. The settled page's number is from
+                    // the row as it was, and in this one (a chapter put in front, say) it may be another chapter's.
+                } else if (target >= 0 && target != pagerState.settledPage) {
                     keepPlace[0] = true
                     pagerState.scrollToPage(target)
                 } else {
