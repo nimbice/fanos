@@ -184,6 +184,7 @@ class BrowserFetcher @Inject constructor(@ApplicationContext private val context
             settings.domStorageEnabled = true // bot checks keep state there
             settings.blockNetworkImage = true
             settings.loadsImagesAutomatically = false
+            BrowserUserAgent.applyTo(this)
             webViewClient =
                 object : WebViewClient() {
                     override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
