@@ -19,7 +19,16 @@ OUT_RES = Path(__file__).resolve().parents[1] / "app" / "src" / "main" / "res"
 OUT_NOTIFICATION = Path(__file__).resolve().parents[1] / "core" / "data" / "src" / "main" / "res" / "drawable" / "ic_notification_lamp.xml"
 PREVIEW = Path(tempfile.gettempdir()) / "fanos-launcher-icon.html"
 
-BACKGROUND = "#101828"
+# Launchers draw their own shape behind every icon; on a pure black wallpaper only a pure black background
+# leaves no box showing round the lamp.
+BACKGROUND = "#000000"
+
+# The geometry below is drawn on the 108dp canvas at its own size, where the lamp and book span x 26.5-81.5,
+# y 22.5-83: 60.5dp tall, centred on y 52.75. The launcher icon (and its themed layer) draws all of it SCALE
+# times larger about that centre, moved to the canvas centre, so they fill the 72dp a launcher shows (18-90):
+# 65.3dp tall (y 21.3-86.7), 59.4dp wide (x 24.3-83.7). The status bar icon keeps the geometry as drawn.
+SCALE = 1.08
+PIVOT = (54, 52.75)
 
 # ---- geometry -------------------------------------------------------------------------------------
 
@@ -130,8 +139,10 @@ METAL = linear(54, 22, 54, 84, [(0, "#F6C19B", 1), (0.45, "#CF7B48", 1), (1, "#8
 FLAME_FILL = radial(54, 55.5, 18.5, [(0, "#FFC247", 1), (0.45, "#FF9B2F", 1), (1, "#F0561C", 1)])
 CORE_FILL = radial(54, 53.5, 7, [(0, "#FFF8E6", 1), (1, "#FFD46A", 1)])
 GLOW_FILL = radial(54, 52, 14.8, [(0, "#FFB35A", 0.5), (0.55, "#FF8A3D", 0.16), (1, "#FF8A3D", 0.03)])
-# The flame's light cast out over the night, gone before the corners.
-HALO_FILL = radial(54, 51, 50, [(0, "#FF9B4A", 0.5), (0.35, "#FF8A3D", 0.22), (0.7, "#FF8A3D", 0.06), (1, "#FF8A3D", 0)])
+# The flame's light cast out over the night, gone before the edge of what the launcher shows: 31 here is
+# 33.5dp once scaled, inside the nearest edge (the top, 34dp from the flame), so the launcher's shape is
+# never lit and the icon has no edge on a black wallpaper.
+HALO_FILL = radial(54, 51, 31, [(0, "#FF9B4A", 0.5), (0.5, "#FF8A3D", 0.22), (0.8, "#FF8A3D", 0.06), (1, "#FF8A3D", 0)])
 # White pages, brightest near the lamp and faded towards their outer edges.
 PAGE_FILL = radial(54, 55, 30, [(0, "#FFFFFF", 0.26), (0.6, "#F1EEE9", 0.18), (1, "#F1EEE9", 0.1)])
 STACK_FILL = solid("#EDE7DE", 0.14)
@@ -228,16 +239,23 @@ def vector_drawable(layers, comment):
         '    android:viewportWidth="108"',
         '    android:viewportHeight="108">',
     ]
+    px, py = PIVOT
+    out.append("    <!-- Everything SCALE times larger about the lamp and book's centre, moved to the canvas centre -->")
+    out.append(
+        f'    <group android:pivotX="{fmt(px)}" android:pivotY="{fmt(py)}" android:scaleX="{fmt(SCALE)}"'
+        f' android:scaleY="{fmt(SCALE)}" android:translateX="{fmt(54 - px)}" android:translateY="{fmt(54 - py)}">'
+    )
     for layer in layers:
         if "group" in layer:
-            out.append(f"    <!-- {layer['comment']} -->")
-            out.append("    <group>")
-            out.append(f'        <clip-path android:pathData="{layer["clip"]}" />')
+            out.append(f"        <!-- {layer['comment']} -->")
+            out.append("        <group>")
+            out.append(f'            <clip-path android:pathData="{layer["clip"]}" />')
             for child in layer["group"]:
-                out += vd_path(child, 8)
-            out.append("    </group>")
+                out += vd_path(child, 12)
+            out.append("        </group>")
         else:
-            out += vd_path(layer, 4)
+            out += vd_path(layer, 8)
+    out.append("    </group>")
     out.append("</vector>")
     return "\n".join(out) + "\n"
 
@@ -311,7 +329,8 @@ def svg_layers(layers, defs):
 
 def svg_icon(size, layers, background, mask="circle", tint=None):
     defs = []
-    body = "".join(svg_layers(layers, defs))
+    px, py = PIVOT
+    body = f'<g transform="translate(54 54) scale({SCALE}) translate({-px} {-py})">' + "".join(svg_layers(layers, defs)) + "</g>"
     _ids[0] += 1
     mid = f"m{_ids[0]}"
     if mask == "circle":
