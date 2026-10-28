@@ -13,7 +13,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import io.github.nimbice.fanos.core.model.ThemeMode
 
-/** Lamplight: warm amber on dark brown, like a page under a desk lamp. */
+/** Lamplight: warm amber on true black (AMOLED), like a page under a desk lamp. */
 private val DarkColors: ColorScheme =
     darkColorScheme(
         primary = Color(0xFFF2C46D),
@@ -30,13 +30,13 @@ private val DarkColors: ColorScheme =
         onTertiaryContainer = Color(0xFFC4EBCB),
         error = Color(0xFFFFB4AB),
         onError = Color(0xFF690005),
-        background = Color(0xFF15120F),
+        background = Color.Black,
         onBackground = Color(0xFFECE1D6),
-        surface = Color(0xFF15120F),
+        surface = Color.Black,
         onSurface = Color(0xFFECE1D6),
         surfaceVariant = Color(0xFF4D4539),
         onSurfaceVariant = Color(0xFFD0C5B4),
-        surfaceContainerLowest = Color(0xFF100D0A),
+        surfaceContainerLowest = Color.Black,
         surfaceContainerLow = Color(0xFF1D1915),
         surfaceContainer = Color(0xFF221D19),
         surfaceContainerHigh = Color(0xFF2C2723),
@@ -97,7 +97,9 @@ fun FanosTheme(
 fun fanosColors(dark: Boolean, dynamicColor: Boolean): ColorScheme {
     val context = LocalContext.current
     return when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
+            if (dark) dynamicDarkColorScheme(context).copy(background = Color.Black, surface = Color.Black, surfaceContainerLowest = Color.Black)
+            else dynamicLightColorScheme(context)
         dark -> DarkColors
         else -> LightColors
     }

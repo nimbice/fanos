@@ -25,6 +25,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -184,7 +185,9 @@ fun FanosApp(links: Flow<AppLink> = emptyFlow(), frame: FrameViewModel = hiltVie
             bottomBar = {
                 if (showBottomBar && !tabBar.hidden) BoxWithConstraints {
                     val labelStyle = fittingStyle(topLevel.map { it.label }, (maxWidth - TabGap * (topLevel.size - 1)) / topLevel.size - TabLabelMargin * 2, MaterialTheme.typography.labelMedium)
-                    NavigationBar {
+                    // Dark, the bar is as black as the screens above it (AMOLED); light, it keeps its tint.
+                    val colors = MaterialTheme.colorScheme
+                    NavigationBar(containerColor = if (colors.surface.luminance() < 0.5f) colors.surface else colors.surfaceContainer) {
                         topLevel.forEach { item ->
                             NavigationBarItem(
                                 selected = destination?.hierarchy?.any { it.hasRoute(item.routeClass) } == true,
