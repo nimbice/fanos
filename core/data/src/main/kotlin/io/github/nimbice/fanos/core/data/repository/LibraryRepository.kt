@@ -9,14 +9,15 @@ import io.github.nimbice.fanos.core.database.TransactionRunner
 import io.github.nimbice.fanos.core.database.dao.NovelDao
 import io.github.nimbice.fanos.core.model.LibraryNovel
 import io.github.nimbice.fanos.core.model.LibraryUpdateProgress
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
+import io.github.nimbice.fanos.source.api.ChallengeRequiredException
+import io.github.nimbice.fanos.source.api.SignInRequiredException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
@@ -80,9 +81,11 @@ class LibraryRepository @Inject constructor(
     private val running = Mutex()
 
     /**
-     * Checks every library novel for new chapters, in the library's order. Several novels are checked
-     * at once; the network layer keeps each site to a couple of requests at a time. A failing novel
-     * does not stop the rest, and keeps why it failed for the library to show ([LibraryNovel.updateError]).
+     * Checks every library novel for new chapters. Each site's novels are checked one after another, in the
+     * library's order, and several sites at once ([bySite]): a site with many novels doesn't hold up the
+     * others, and no site is asked about more than one novel at a time. A failing novel does not stop the
+     * rest, and keeps why it failed for the library to show ([LibraryNovel.updateError]); once a site wants a
+     * browser check or a sign-in, its novels still waiting are given that reason without asking it again.
      * [progress] follows each novel as it starts and finishes. [onFound] hears of each novel's new chapters
      * once they are saved, so a check stopped part way still knows what it found; it never hears two at once.
      * Novels whose extension isn't installed are left out: there is nothing to check them with. One update
@@ -104,34 +107,33 @@ class LibraryRepository @Inject constructor(
                     _progress.value = LibraryUpdateProgress(novelsToCheck.size - waiting.size, novelsToCheck.size, waiting.toSet(), checking.toMap())
                 }
             report {}
-            val permits = Semaphore(PARALLEL_NOVELS)
             val results =
-                coroutineScope {
-                    novelsToCheck.map { novel ->
-                        async {
-                            permits.withPermit {
-                                report { checking[novel.id] = System.currentTimeMillis() }
-                                val result =
-                                    suspendRunCatching { novels.refreshChapters(novel.id) }.map { found ->
-                                        NovelUpdate(novel.id, novel.title, found.map { it.title }, found.map { it.id })
-                                    }
-                                // Kept before the novel stops waiting, so the library shows it the moment it's done.
-                                result.exceptionOrNull()?.let { error -> novelDao.setUpdateError(novel.id, userMessage(error)) }
-                                report {
-                                    checking.remove(novel.id)
-                                    waiting.remove(novel.id)
-                                }
-                                result.getOrNull()?.takeIf { it.chapters.isNotEmpty() }?.let { found -> lock.withLock { onFound(found) } }
-                                novel.id to result
-                            }
+                bySite(
+                    novelsToCheck,
+                    siteOf = { it.sourceId },
+                    parallelSites = PARALLEL_SITES,
+                    stopsSite = { it is ChallengeRequiredException || it is SignInRequiredException },
+                    check = { novel ->
+                        report { checking[novel.id] = System.currentTimeMillis() }
+                        suspendRunCatching { novels.refreshChapters(novel.id) }.map { found ->
+                            NovelUpdate(novel.id, novel.title, found.map { it.title }, found.map { it.id })
                         }
-                    }.awaitAll()
-                }
+                    },
+                    settle = { novel, result ->
+                        // Kept before the novel stops waiting, so the library shows it the moment it's done.
+                        result.exceptionOrNull()?.let { error -> novelDao.setUpdateError(novel.id, userMessage(error)) }
+                        report {
+                            checking.remove(novel.id)
+                            waiting.remove(novel.id)
+                        }
+                        result.getOrNull()?.takeIf { it.chapters.isNotEmpty() }?.let { found -> lock.withLock { onFound(found) } }
+                    },
+                )
             return LibraryUpdateResult(
                 checked = novelsToCheck.size,
                 withoutExtension = withoutExtension.size,
-                updated = results.mapNotNull { (_, result) -> result.getOrNull()?.takeIf { it.chapters.isNotEmpty() } },
-                failures = results.mapNotNull { (id, result) -> result.exceptionOrNull()?.let { id to it } }.toMap(),
+                updated = results.mapNotNull { it.getOrNull()?.takeIf { update -> update.chapters.isNotEmpty() } },
+                failures = novelsToCheck.zip(results).mapNotNull { (novel, result) -> result.exceptionOrNull()?.let { novel.id to it } }.toMap(),
             )
         } finally {
             _progress.value = null
@@ -140,8 +142,44 @@ class LibraryRepository @Inject constructor(
     }
 
     private companion object {
-        const val PARALLEL_NOVELS = 4
+        const val PARALLEL_SITES = 4
     }
+}
+
+/**
+ * Runs [check] on [items] a site at a time: each site's items one after another, in their order, with up to
+ * [parallelSites] sites going at once. [settle] hears each item's answer as it comes. Once a site answers with
+ * an error that [stopsSite] (one only the reader can get past), its items still waiting get that same answer
+ * without [check] being asked. The answers come back in [items]' order.
+ */
+internal suspend fun <T, R> bySite(
+    items: List<T>,
+    siteOf: (T) -> String,
+    parallelSites: Int,
+    stopsSite: (Throwable) -> Boolean,
+    check: suspend (T) -> Result<R>,
+    settle: suspend (T, Result<R>) -> Unit,
+): List<Result<R>> {
+    val answers = MutableList<Result<R>?>(items.size) { null }
+    val permits = Semaphore(parallelSites)
+    coroutineScope {
+        items.indices.groupBy { siteOf(items[it]) }.values.forEach { site ->
+            launch {
+                permits.withPermit {
+                    var stoppedBy: Throwable? = null
+                    for (index in site) {
+                        val item = items[index]
+                        val answer = stoppedBy?.let { Result.failure(it) } ?: check(item)
+                        answer.exceptionOrNull()?.takeIf(stopsSite)?.let { stoppedBy = it }
+                        answers[index] = answer
+                        settle(item, answer)
+                    }
+                }
+            }
+        }
+    }
+    // Every site has run to its end by now, so every item has its answer.
+    return answers.map { it!! }
 }
 
 data class LibraryUpdateResult(
