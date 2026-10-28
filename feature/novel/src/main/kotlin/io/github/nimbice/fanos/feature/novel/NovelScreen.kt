@@ -113,8 +113,6 @@ import io.github.nimbice.fanos.core.model.ChapterGroup
 import io.github.nimbice.fanos.core.model.Novel
 import io.github.nimbice.fanos.core.model.NovelStatus
 import kotlinx.coroutines.launch
-import java.text.DateFormat
-import java.util.Date
 import io.github.nimbice.fanos.core.designsystem.component.RemoveBooksDialog
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -486,11 +484,14 @@ fun NovelScreen(
                                 )
                             }
                         }
+                        val today = LocalDate.now()
+                        val zone = ZoneId.systemDefault()
                         items(shown, key = { it.id }) { chapter ->
                             val isFound = chapter.id == found?.id
                             ChapterRow(
                                 chapter = chapter,
                                 group = chapter.group.takeIf { showGroups && novel.chapterGroup == null },
+                                age = chapterAge(chapter, today, zone),
                                 isLastRead = chapter.id == state.lastReadChapterId,
                                 download = state.downloads[chapter.id],
                                 selecting = selected.isNotEmpty(),
@@ -981,6 +982,8 @@ private fun ChapterRow(
     chapter: Chapter,
     /** The translation group that put it out, when the list shows several groups'. */
     group: String?,
+    /** Its day and how long ago that was ("Oct 12, 2026 · 16 days ago"), when there's a day to give. */
+    age: String?,
     isLastRead: Boolean,
     download: ChapterDownload?,
     selecting: Boolean,
@@ -1008,8 +1011,7 @@ private fun ChapterRow(
     ) {
         Column(Modifier.weight(1f)) {
             Text(chapter.title, style = MaterialTheme.typography.bodyMedium, color = color, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            val published = chapter.publishedAt?.let { DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(it)) }
-            val line = listOfNotNull(found, group, published, if (chapter.locked) "Members only" else null).joinToString(" · ")
+            val line = listOfNotNull(found, group, age, if (chapter.locked) "Members only" else null).joinToString(" · ")
             if (line.isNotEmpty()) Text(line, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (chapter.locked) {
