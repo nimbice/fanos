@@ -1,0 +1,4 @@
+• In dark mode the library, settings, browse, downloads and the bottom bar are now pure black, made for AMOLED screens. Cards and panels keep their warm tint, so they still stand out.
+• The app icon now sits on a pure black background, with a slightly larger lamp.
+• This week shows the time of day a novel's chapters usually come out. For sites that give no release times, it estimates one from when new chapters turned up ("likely between 7 and 8 AM").
+• This week also recognises daily novels,…

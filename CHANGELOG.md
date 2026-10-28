@@ -3,6 +3,15 @@
 What changed in each release of Fanos, newest first. The newest is always on the
 [releases page](https://github.com/nimbice/fanos/releases/latest).
 
+## 0.1.6 (2026-10-28)
+
+- In dark mode the library, settings, browse, downloads and the bottom bar are now pure black, made for AMOLED screens. Cards and panels keep their warm tint, so they still stand out.
+- The app icon now sits on a pure black background, with a slightly larger lamp.
+- This week shows the time of day a novel's chapters usually come out. For sites that give no release times, it estimates one from when new chapters turned up ("likely between 7 and 8 AM").
+- This week also recognises daily novels, several chapters a day and novels with no set day better, and its rows wrap at large text sizes instead of being cut off.
+- Fixed: turning a page just after opening a chapter from a new-chapter notification could slide back into the chapter before.
+- Fixed: signing in with Google inside the app (for example on Patreon) went round in circles.
+
 ## 0.1.5 (2026-10-05)
 
 - The icon at the end of the reader's brightness slider is now a button that hands brightness back to your phone, automatic brightness included. It's lit while your phone's own brightness is in use.
