@@ -87,12 +87,14 @@ class LibraryRepository @Inject constructor(
      * once they are saved, so a check stopped part way still knows what it found; it never hears two at once.
      * Novels whose extension isn't installed are left out: there is nothing to check them with. One update
      * runs at a time: one asked for while another runs (the scheduled one and the reader's) leaves it to that one.
+     * With [novelIds], only those of the library's novels are checked.
      */
-    suspend fun update(onFound: suspend (NovelUpdate) -> Unit = {}): LibraryUpdateResult {
+    suspend fun update(novelIds: Set<Long>? = null, onFound: suspend (NovelUpdate) -> Unit = {}): LibraryUpdateResult {
         if (!running.tryLock()) return LibraryUpdateResult(checked = 0, withoutExtension = 0, updated = emptyList(), failures = emptyMap())
         try {
             val available = sources.ids()
-            val (novelsToCheck, withoutExtension) = novelDao.libraryTitles().partition { it.sourceId in available }
+            val (novelsToCheck, withoutExtension) =
+                novelDao.libraryTitles().filter { novelIds == null || it.id in novelIds }.partition { it.sourceId in available }
             val waiting = novelsToCheck.mapTo(LinkedHashSet()) { it.id }
             val checking = LinkedHashMap<Long, Long>()
             val lock = Mutex()

@@ -10,7 +10,9 @@ import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 import kotlin.math.abs
+import java.time.Duration
 import java.time.LocalTime
+import java.time.ZonedDateTime
 import kotlin.math.ceil
 
 /** When a novel's chapters come out, going by when the last few weeks' did. */
@@ -261,6 +263,37 @@ fun ReleasePattern.dueOn(day: LocalDate): Boolean =
         is ReleasePattern.Between -> day == from
     }
 
+/**
+ * When to look for a novel's next chapter: [after] the time of day its chapters come out (the end of their window), on
+ * the next day one is due. Null when either can't be told: a novel with no set day, or no [time]. A day already
+ * [released] on is passed over, and so is a check whose moment has gone by: a chapter late today is the regular
+ * checks' to find.
+ */
+fun nextReleaseCheck(
+    pattern: ReleasePattern,
+    time: ReleaseTime?,
+    released: Collection<LocalDate>,
+    now: ZonedDateTime,
+    after: Duration = RELEASE_CHECK_DELAY,
+): ZonedDateTime? {
+    if (pattern is ReleasePattern.Between) return null
+    // A window past midnight ends the day after it opens.
+    val (out, overnight) =
+        when (time) {
+            is ReleaseTime.At -> time.time to false
+            is ReleaseTime.Window -> time.to to (time.to < time.from)
+            null -> return null
+        }
+    val today = now.toLocalDate()
+    for (ahead in 0..CHECK_DAYS_AHEAD) {
+        val day = today.plusDays(ahead)
+        if (!pattern.dueOn(day) || day in released) continue
+        val at = (if (overnight) day.plusDays(1) else day).atTime(out).atZone(now.zone).plus(after)
+        if (at.isAfter(now)) return at
+    }
+    return null
+}
+
 /** The next chapter's window in words: "between Monday and Friday, Monday at the earliest". */
 private fun nextBetween(pattern: ReleasePattern.Between, today: LocalDate, locale: Locale): String {
     fun day(date: LocalDate): String {
@@ -330,6 +363,12 @@ private fun nextOn(days: List<DayOfWeek>, last: LocalDate, today: LocalDate): Lo
     while (next.dayOfWeek !in days) next = next.plusDays(1)
     return next
 }
+
+/** How long after a chapter is expected out its novel is checked: time for a site running a little late. */
+val RELEASE_CHECK_DELAY: Duration = Duration.ofMinutes(30)
+
+/** How far ahead a release check is looked for: past any step [ReleasePattern.Every] takes. */
+private const val CHECK_DAYS_AHEAD = 70L
 
 /** How many chapters must have the site's date for those dates to go by. */
 private const val DATED_SHARE = 0.8

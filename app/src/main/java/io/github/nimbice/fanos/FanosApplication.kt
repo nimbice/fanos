@@ -16,6 +16,7 @@ import io.github.nimbice.fanos.core.data.source.WaitingNovels
 import io.github.nimbice.fanos.core.data.work.BackupScheduler
 import io.github.nimbice.fanos.core.data.work.DownloadScheduler
 import io.github.nimbice.fanos.core.data.work.LibraryUpdateScheduler
+import io.github.nimbice.fanos.core.data.work.ReleaseCheckScheduler
 import io.github.nimbice.fanos.core.updater.UpdateScheduler
 import okhttp3.OkHttpClient
 import javax.inject.Inject
@@ -29,6 +30,8 @@ class FanosApplication : Application(), Configuration.Provider, SingletonImageLo
     @Inject lateinit var okHttpClient: Lazy<OkHttpClient>
 
     @Inject lateinit var libraryUpdates: LibraryUpdateScheduler
+
+    @Inject lateinit var releaseChecks: ReleaseCheckScheduler
 
     @Inject lateinit var backups: BackupScheduler
 
@@ -51,6 +54,7 @@ class FanosApplication : Application(), Configuration.Provider, SingletonImageLo
         extensions.start()
         waitingNovels.start()
         libraryUpdates.start()
+        releaseChecks.start()
         backups.start()
         downloads.start()
         updates.start()

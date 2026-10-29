@@ -71,8 +71,11 @@ class LibraryUpdateScheduler @Inject constructor(
         workManager.enqueueUniqueWork(MANUAL, ExistingWorkPolicy.KEEP, request)
     }
 
-    private companion object {
+    internal companion object {
         const val PERIODIC = "library-update"
         const val MANUAL = "library-update-now"
+
+        /** The library updates' unique work, scheduled and asked for. */
+        val WORK_NAMES = listOf(PERIODIC, MANUAL)
     }
 }

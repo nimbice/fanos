@@ -22,8 +22,8 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 
 /**
- * Checks the library for new chapters: on a schedule, and right away for pull-to-refresh. The
- * scheduled check posts what it found.
+ * Checks the library for new chapters: on a schedule, and right away for pull-to-refresh; or just the novels
+ * due a chapter about now ([ReleaseCheckScheduler]). The scheduled checks post what they found.
  */
 @HiltWorker
 class LibraryUpdateWorker @AssistedInject constructor(
@@ -38,7 +38,8 @@ class LibraryUpdateWorker @AssistedInject constructor(
         val found = mutableListOf<NovelUpdate>()
         try {
             // How it's going is the repository's to tell (LibraryRepository.progress): novel by novel, more than work data holds.
-            val result = library.update(onFound = { found += it })
+            val novelIds = inputData.getLongArray(KEY_NOVEL_IDS)?.toSet()
+            val result = library.update(novelIds, onFound = { found += it })
             return Result.success(workDataOf(KEY_NEW_CHAPTERS to result.newChapters, KEY_FAILED to result.failures.size))
         } finally {
             // Also when Android stops the check part way (the connection went, say): the chapters found
@@ -72,6 +73,9 @@ class LibraryUpdateWorker @AssistedInject constructor(
     companion object {
         /** Input: post a notification about the new chapters found. */
         const val KEY_NOTIFY = "notify"
+
+        /** Input: check only these novels (a [ReleaseCheckScheduler] check), not the whole library. */
+        const val KEY_NOVEL_IDS = "novel_ids"
         const val KEY_NEW_CHAPTERS = "new_chapters"
         const val KEY_FAILED = "failed"
         private const val CHANNEL = "library_updates"
