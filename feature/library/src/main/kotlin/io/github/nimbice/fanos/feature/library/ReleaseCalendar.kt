@@ -20,12 +20,16 @@ import io.github.nimbice.fanos.core.data.release.patternText
 import io.github.nimbice.fanos.core.designsystem.component.EmptyState
 import io.github.nimbice.fanos.core.designsystem.component.LoadingState
 import java.time.LocalDate
+import java.time.ZonedDateTime
 import java.time.format.TextStyle
 import java.util.Locale
 import android.text.format.DateFormat
 import androidx.compose.ui.platform.LocalContext
 import io.github.nimbice.fanos.core.data.release.ReleaseTime
 import io.github.nimbice.fanos.core.data.release.timeText
+import io.github.nimbice.fanos.core.data.release.expectedDay
+import io.github.nimbice.fanos.core.data.release.hoursAway
+import io.github.nimbice.fanos.core.designsystem.component.rememberMinute
 import io.github.nimbice.fanos.core.data.release.windowText
 import io.github.nimbice.fanos.core.data.release.perDayText
 
@@ -53,7 +57,9 @@ internal fun ReleaseCalendarPane(novels: List<CalendarNovel>?, onOpenNovel: (Lon
         novels.isEmpty() ->
             EmptyState("No patterns yet", "When library novels' new chapters usually come out shows here, once there are a few weeks to go by.")
         else -> {
-            val today = LocalDate.now()
+            // How far off today's and tomorrow's are counts down by the minute.
+            val clock = rememberMinute()
+            val today = clock.toLocalDate()
             // Out every day or most days: one list after today's, every day first.
             val mostDays = novels.filter { it.pattern is ReleasePattern.MostDays }.sortedByDescending { (it.pattern as ReleasePattern.MostDays).everyDay }
             val week =
@@ -67,15 +73,15 @@ internal fun ReleaseCalendarPane(novels: List<CalendarNovel>?, onOpenNovel: (Lon
             LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
                 todays.forEach { (day, due) ->
                     item(key = "day $day") { CalendarHeading(calendarDay(day, today)) }
-                    items(due, key = { "$day ${it.novelId}" }) { CalendarRow(it, today = true, now = today, is24Hour, onOpenNovel) }
+                    items(due, key = { "$day ${it.novelId}" }) { CalendarRow(it, day, today = true, clock, is24Hour, onOpenNovel) }
                 }
                 if (mostDays.isNotEmpty()) {
                     item(key = "most") { CalendarHeading("Daily") }
-                    items(mostDays, key = { "most ${it.novelId}" }) { CalendarRow(it, today = true, now = today, is24Hour, onOpenNovel) }
+                    items(mostDays, key = { "most ${it.novelId}" }) { CalendarRow(it, day = null, today = true, clock, is24Hour, onOpenNovel) }
                 }
                 ahead.forEach { (day, due) ->
                     item(key = "day $day") { CalendarHeading(calendarDay(day, today)) }
-                    items(due, key = { "$day ${it.novelId}" }) { CalendarRow(it, today = day == today, now = today, is24Hour, onOpenNovel) }
+                    items(due, key = { "$day ${it.novelId}" }) { CalendarRow(it, day, today = day == today, clock, is24Hour, onOpenNovel) }
                 }
                 item(key = "foot") {
                     val notes =
@@ -114,14 +120,23 @@ private fun CalendarHeading(text: String) {
  * set day says which days its next could come, and that the day it's under is an early guess.
  */
 @Composable
-private fun CalendarRow(novel: CalendarNovel, today: Boolean, now: LocalDate, is24Hour: Boolean, onOpenNovel: (Long) -> Unit) {
+private fun CalendarRow(novel: CalendarNovel, day: LocalDate?, today: Boolean, clock: ZonedDateTime, is24Hour: Boolean, onOpenNovel: (Long) -> Unit) {
     val pattern = novel.pattern
+    val now = clock.toLocalDate()
+    // Under a day, that day's; in the daily list, today's until it's out or its time has gone by, then tomorrow's. Not
+    // for a novel with no set day: when its next comes is a guess.
+    val away =
+        novel.time?.takeIf { pattern !is ReleasePattern.Between }?.let { time ->
+            val released = if (novel.outToday) listOf(now) else emptyList()
+            (day ?: expectedDay(pattern, time, released, clock))?.takeUnless { it in released }?.let { hoursAway(it, time, clock) }
+        }
     val line =
         listOfNotNull(
             patternText(pattern),
             perDayText(pattern, novel.perDay),
             (pattern as? ReleasePattern.Between)?.let { windowText(it, now) },
             novel.time?.let { timeText(it, is24Hour) },
+            away,
         ).joinToString(" · ").replaceFirstChar { it.uppercase() }
     RecentRow(
         coverUrl = novel.coverUrl,

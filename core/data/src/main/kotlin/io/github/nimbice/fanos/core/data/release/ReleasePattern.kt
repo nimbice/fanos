@@ -2,9 +2,11 @@ package io.github.nimbice.fanos.core.data.release
 
 import io.github.nimbice.fanos.core.model.Chapter
 import java.time.DayOfWeek
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
@@ -182,6 +184,8 @@ fun releasePattern(days: Collection<LocalDate>, today: LocalDate): ReleasePatter
 /**
  * The pattern in words, for under the novel's status: "New chapters usually Mon and Thu, around 6 PM", then on a line of
  * its own "Next about Thursday". With no set day, the window: "Next between Monday and Friday, Monday at the earliest".
+ * [away], how far off the next is when it's soon ([hoursAway]), says when instead: "Next about 5 hours from now", for a
+ * novel out most days too.
  */
 fun releaseText(
     pattern: ReleasePattern,
@@ -190,12 +194,15 @@ fun releaseText(
     time: ReleaseTime? = null,
     is24Hour: Boolean = false,
     perDay: Int = 1,
+    away: String? = null,
 ): String {
     val at = (perDayText(pattern, perDay, short = true)?.let { ", $it" }.orEmpty()) + time?.let { ", " + timeText(it, is24Hour) }.orEmpty()
+    // Soon, the hours say it all: "about tomorrow, about 21 hours from now" says it twice.
+    fun next(day: LocalDate) = "\nNext ${away ?: whenDue(day, today, locale)}"
     return when (pattern) {
-        is ReleasePattern.MostDays -> "New chapters ${if (pattern.everyDay) "every day" else "most days"}$at"
-        is ReleasePattern.Weekdays -> "New chapters usually ${weekdays(pattern.days, locale)}$at\nNext ${whenDue(pattern.next, today, locale)}"
-        is ReleasePattern.Every -> "New chapters about ${every(pattern.days)}$at\nNext ${whenDue(pattern.next, today, locale)}"
+        is ReleasePattern.MostDays -> "New chapters ${if (pattern.everyDay) "every day" else "most days"}$at${away?.let { "\nNext $it" }.orEmpty()}"
+        is ReleasePattern.Weekdays -> "New chapters usually ${weekdays(pattern.days, locale)}$at${next(pattern.next)}"
+        is ReleasePattern.Every -> "New chapters about ${every(pattern.days)}$at${next(pattern.next)}"
         is ReleasePattern.Between ->
             "New chapters every ${pattern.shortest} to ${pattern.longest} days, no set day$at\nNext ${nextBetween(pattern, today, locale)}"
     }
@@ -228,6 +235,50 @@ fun timeText(time: ReleaseTime, is24Hour: Boolean = false): String =
             val between = "between ${clockText(time.from, is24Hour, meridiem = !sameHalf)} and ${clockText(time.to, is24Hour, meridiem = true)}"
             if (time.estimated) "likely $between" else between
         }
+    }
+
+/**
+ * The day a novel's next chapter is expected: the pattern's next; for one out most days, today until today's is out (a
+ * day in [released]) or its [time] has gone by, then tomorrow. Null with no set day.
+ */
+fun expectedDay(pattern: ReleasePattern, time: ReleaseTime, released: Collection<LocalDate>, now: ZonedDateTime): LocalDate? =
+    when (pattern) {
+        is ReleasePattern.Weekdays -> pattern.next
+        is ReleasePattern.Every -> pattern.next
+        is ReleasePattern.Between -> null
+        is ReleasePattern.MostDays -> {
+            val today = now.toLocalDate()
+            if (today in released || !expectedAt(today, time, now.zone).second.isAfter(now)) today.plusDays(1) else today
+        }
+    }
+
+/**
+ * How far off [day]'s chapter, out at [time], is when that's within a day: "about 5 hours from now", "less than an hour
+ * from now"; for a window, "4 to 5 hours from now", or "within 2 hours" once it's open. Null further off, and once the
+ * time (the window) has gone by.
+ */
+fun hoursAway(day: LocalDate, time: ReleaseTime, now: ZonedDateTime): String? {
+    val (start, end) = expectedAt(day, time, now.zone)
+    if (!end.isAfter(now) || start.isAfter(now.plusHours(24))) return null
+    // To the nearest hour.
+    fun hours(until: ZonedDateTime) = (Duration.between(now, until).toMinutes().coerceAtLeast(0) + 30) / 60
+    val from = hours(start)
+    val to = hours(end)
+    fun inWords(hours: Long) = if (hours == 1L) "an hour" else "$hours hours"
+    return when {
+        to == 0L -> "less than an hour from now"
+        from == to -> "about ${inWords(to)} from now"
+        from == 0L -> "within ${inWords(to)}"
+        else -> "$from to $to hours from now"
+    }
+}
+
+/** When [day]'s chapter comes out at [time]: from and to, the same moment for one time; a window past midnight ends the next day. */
+private fun expectedAt(day: LocalDate, time: ReleaseTime, zone: ZoneId): Pair<ZonedDateTime, ZonedDateTime> =
+    when (time) {
+        is ReleaseTime.At -> day.atTime(time.time).atZone(zone).let { it to it }
+        is ReleaseTime.Window ->
+            day.atTime(time.from).atZone(zone) to (if (time.to < time.from) day.plusDays(1) else day).atTime(time.to).atZone(zone)
     }
 
 /**

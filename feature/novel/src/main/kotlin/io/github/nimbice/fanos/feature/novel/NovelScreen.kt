@@ -124,14 +124,15 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
-import java.time.LocalDate
-import java.time.ZoneId
 import io.github.nimbice.fanos.core.data.release.releaseDays
 import io.github.nimbice.fanos.core.data.release.releasePattern
 import io.github.nimbice.fanos.core.data.release.releaseText
 import io.github.nimbice.fanos.core.designsystem.component.FittingText
 import androidx.compose.material3.HorizontalDivider
 import io.github.nimbice.fanos.core.data.release.releaseTime
+import io.github.nimbice.fanos.core.data.release.expectedDay
+import io.github.nimbice.fanos.core.data.release.hoursAway
+import io.github.nimbice.fanos.core.designsystem.component.rememberMinute
 import androidx.compose.ui.platform.LocalContext
 import io.github.nimbice.fanos.core.data.release.chaptersPerDay
 
@@ -167,15 +168,19 @@ fun NovelScreen(
     // When new chapters come out, going by when the last few weeks' did (the time of day too, from the site's own
     // times): for a novel still coming out.
     val is24Hour = android.text.format.DateFormat.is24HourFormat(LocalContext.current)
+    // How far off the next is, when that's soon, counts down by the minute.
+    val now = rememberMinute()
     val release =
-        remember(state.chapters, novel?.status, is24Hour) {
-            val today = LocalDate.now()
-            val zone = ZoneId.systemDefault()
+        remember(state.chapters, novel?.status, is24Hour, now) {
+            val today = now.toLocalDate()
+            val zone = now.zone
             novel?.takeIf { it.status == NovelStatus.Ongoing || it.status == NovelStatus.Unknown }
                 ?.let { releaseDays(state.chapters, zone) }
                 ?.let { days ->
-                    releasePattern(days, today)?.let {
-                        releaseText(it, today, time = releaseTime(state.chapters, zone), is24Hour = is24Hour, perDay = chaptersPerDay(days))
+                    releasePattern(days, today)?.let { pattern ->
+                        val time = releaseTime(state.chapters, zone)
+                        val away = time?.let { expectedDay(pattern, it, days, now)?.let { day -> hoursAway(day, it, now) } }
+                        releaseText(pattern, today, time = time, is24Hour = is24Hour, perDay = chaptersPerDay(days), away = away)
                     }
                 }
         }
