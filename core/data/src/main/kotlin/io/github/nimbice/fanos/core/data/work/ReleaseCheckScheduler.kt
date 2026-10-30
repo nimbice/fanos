@@ -34,9 +34,9 @@ import javax.inject.Singleton
 
 /**
  * Checks a novel on its own just after its next chapter is expected out ([nextReleaseCheck]): for the novels whose
- * chapters come out on known days at a known time of day, rather than waiting for the next library update; again every
- * half hour for two hours while it isn't there, but not within an hour of the scheduled library update, which looks
- * anyway. One check waits at a time, the soonest, worked out afresh whenever no library check is running: at app
+ * chapters come out on known days at a known time of day, rather than waiting for the next library update; a minute
+ * after, then again 5, 10, 30, 30 and 30 minutes on while it isn't there, but not within an hour of the scheduled
+ * library update, which looks anyway. One check waits at a time, the soonest, worked out afresh whenever no library check is running: at app
  * start, and after each one (this one too) finishes, when what it found may have moved the novel's next chapter on.
  * Off with the library updates.
  */
@@ -108,11 +108,12 @@ class ReleaseCheckScheduler @Inject constructor(
 
 /**
  * The soonest of [checks] (each novel's next check, epoch milliseconds) and the novels due then: the ones within
- * [together] of it are checked with it, rather than each a minute or two apart. Null with none.
+ * [together] of it are checked with it, rather than each a few seconds apart; no more, as a check much early would
+ * come before a chapter due a minute before it. Null with none.
  */
 internal fun soonestChecks(checks: Map<Long, Long>, together: Long = TOGETHER_MS): Pair<Long, Set<Long>>? {
     val soonest = checks.values.minOrNull() ?: return null
     return soonest to checks.filterValues { it <= soonest + together }.keys
 }
 
-private const val TOGETHER_MS = 5 * 60 * 1000L
+private const val TOGETHER_MS = 60 * 1000L

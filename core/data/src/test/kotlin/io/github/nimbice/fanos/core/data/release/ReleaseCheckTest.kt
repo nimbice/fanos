@@ -21,18 +21,18 @@ class ReleaseCheckTest {
     private val sixPm = ReleaseTime.At(LocalTime.of(18, 0))
 
     @Test
-    fun `half an hour after the time on the day it's due`() {
+    fun `a minute after the time on the day it's due`() {
         val thursdays = ReleasePattern.Weekdays(listOf(DayOfWeek.THURSDAY), next = today)
 
-        assertEquals(at(today, 18, 30), nextReleaseCheck(thursdays, sixPm, emptyList(), at(today, 9)))
+        assertEquals(at(today, 18, 1), nextReleaseCheck(thursdays, sixPm, emptyList(), at(today, 9)))
     }
 
     @Test
-    fun `a window is checked half an hour after it closes`() {
+    fun `a window is checked a minute after it closes`() {
         val daily = ReleasePattern.MostDays(everyDay = true)
         val window = ReleaseTime.Window(LocalTime.of(14, 0), LocalTime.of(17, 0), estimated = true)
 
-        assertEquals(at(today, 17, 30), nextReleaseCheck(daily, window, emptyList(), at(today, 9)))
+        assertEquals(at(today, 17, 1), nextReleaseCheck(daily, window, emptyList(), at(today, 9)))
     }
 
     @Test
@@ -40,30 +40,34 @@ class ReleaseCheckTest {
         val daily = ReleasePattern.MostDays(everyDay = true)
         val window = ReleaseTime.Window(LocalTime.of(23, 0), LocalTime.of(1, 0))
 
-        assertEquals(at(today.plusDays(1), 1, 30), nextReleaseCheck(daily, window, emptyList(), at(today, 9)))
+        assertEquals(at(today.plusDays(1), 1, 1), nextReleaseCheck(daily, window, emptyList(), at(today, 9)))
     }
 
     @Test
-    fun `not there yet, again every half hour for two hours`() {
+    fun `not there yet, again 5, 10, 30, 30 and 30 minutes on`() {
         val thursdays = ReleasePattern.Weekdays(listOf(DayOfWeek.THURSDAY), next = today)
+        // Each check runs, finds nothing, and the next is worked out from just after it.
+        val checks = generateSequence(at(today, 9)) { nextReleaseCheck(thursdays, sixPm, emptyList(), it.plusSeconds(20)) }
+            .drop(1)
+            .takeWhile { it.toLocalDate() == today }
+            .map { it.toLocalTime() }
+            .toList()
 
-        assertEquals(at(today, 19, 0), nextReleaseCheck(thursdays, sixPm, emptyList(), at(today, 18, 31)))
-        assertEquals(at(today, 20, 30), nextReleaseCheck(thursdays, sixPm, emptyList(), at(today, 20, 1)))
+        assertEquals(listOf("18:01", "18:06", "18:16", "18:46", "19:16", "19:46").map(LocalTime::parse), checks)
     }
 
     @Test
-    fun `two hours on, it's given up until the next day it's due`() {
+    fun `after the last, it's given up until the next day it's due`() {
         val monThu = ReleasePattern.Weekdays(listOf(DayOfWeek.MONDAY, DayOfWeek.THURSDAY), next = today)
 
-        // Thursday's checks ran 6:30 to 8:30: next Monday's.
-        assertEquals(at(LocalDate.of(2026, 11, 2), 18, 30), nextReleaseCheck(monThu, sixPm, emptyList(), at(today, 20, 30)))
+        assertEquals(at(LocalDate.of(2026, 11, 2), 18, 1), nextReleaseCheck(monThu, sixPm, emptyList(), at(today, 19, 46)))
     }
 
     @Test
     fun `found, the checks after it stop`() {
         val monThu = ReleasePattern.Weekdays(listOf(DayOfWeek.MONDAY, DayOfWeek.THURSDAY), next = today)
 
-        assertEquals(at(LocalDate.of(2026, 11, 2), 18, 30), nextReleaseCheck(monThu, sixPm, listOf(today), at(today, 19, 1)))
+        assertEquals(at(LocalDate.of(2026, 11, 2), 18, 1), nextReleaseCheck(monThu, sixPm, listOf(today), at(today, 18, 2)))
     }
 
     @Test
@@ -71,34 +75,34 @@ class ReleaseCheckTest {
         val thursdays = ReleasePattern.Weekdays(listOf(DayOfWeek.THURSDAY), next = today)
         val elevenPm = ReleaseTime.At(LocalTime.of(23, 0))
 
-        // Friday 12:40 AM, Thursday's chapter not there yet: the 1 AM check.
-        assertEquals(at(today.plusDays(1), 1, 0), nextReleaseCheck(thursdays, elevenPm, emptyList(), at(today.plusDays(1), 0, 40)))
+        // Friday 12:20 AM, Thursday's chapter not there yet: the last check, at 12:46.
+        assertEquals(at(today.plusDays(1), 0, 46), nextReleaseCheck(thursdays, elevenPm, emptyList(), at(today.plusDays(1), 0, 20)))
     }
 
     @Test
     fun `within an hour of the regular check, it's left to that one`() {
         val thursdays = ReleasePattern.Weekdays(listOf(DayOfWeek.THURSDAY), next = today)
-        val regular = at(today, 19, 15).toInstant().toEpochMilli()
+        val regular = at(today, 18, 30).toInstant().toEpochMilli()
         val sixHours = 6 * 60 * 60 * 1000L
         val near = { at: ZonedDateTime -> nearRegularCheck(at, regular, sixHours) }
 
-        // 6:30 to 8:00 are within the hour of 7:15; 8:30 isn't.
-        assertEquals(at(today, 20, 30), nextReleaseCheck(thursdays, sixPm, emptyList(), at(today, 9), near))
+        // 6:01 to 7:16 are within the hour of 6:30; 7:46 isn't.
+        assertEquals(at(today, 19, 46), nextReleaseCheck(thursdays, sixPm, emptyList(), at(today, 9), near))
     }
 
     @Test
     fun `a day that already had its chapter is passed over`() {
         val daily = ReleasePattern.MostDays(everyDay = true)
 
-        assertEquals(at(today.plusDays(1), 18, 30), nextReleaseCheck(daily, sixPm, listOf(today), at(today, 9)))
+        assertEquals(at(today.plusDays(1), 18, 1), nextReleaseCheck(daily, sixPm, listOf(today), at(today, 9)))
     }
 
     @Test
     fun `every so many days, from the next one due`() {
         val everyThird = ReleasePattern.Every(3, next = today.plusDays(2))
 
-        assertEquals(at(today.plusDays(2), 18, 30), nextReleaseCheck(everyThird, sixPm, emptyList(), at(today, 9)))
-        assertEquals(at(today.plusDays(5), 18, 30), nextReleaseCheck(everyThird, sixPm, emptyList(), at(today.plusDays(2), 21)))
+        assertEquals(at(today.plusDays(2), 18, 1), nextReleaseCheck(everyThird, sixPm, emptyList(), at(today, 9)))
+        assertEquals(at(today.plusDays(5), 18, 1), nextReleaseCheck(everyThird, sixPm, emptyList(), at(today.plusDays(2), 21)))
     }
 
     @Test

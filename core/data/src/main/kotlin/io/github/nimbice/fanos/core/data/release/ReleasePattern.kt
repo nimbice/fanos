@@ -315,9 +315,9 @@ fun ReleasePattern.dueOn(day: LocalDate): Boolean =
     }
 
 /**
- * When to look for a novel's next chapter: [RELEASE_CHECK_DELAY] after the time of day its chapters come out (the end
- * of their window), on the next day one is due; not there yet, again every [RELEASE_RETRY_EVERY] for
- * [RELEASE_RETRY_FOR], then it's left to the regular checks. Null when the day or the time can't be told: a novel with
+ * When to look for a novel's next chapter, going by the time of day its chapters come out (the end of their window) on
+ * the next day one is due: a minute after it, then while it isn't there [RELEASE_CHECKS] apart, then it's left to the
+ * regular checks. Null when the day or the time can't be told: a novel with
  * no set day, or no [time]. A day already [released] on is passed over (a check that found its chapter ends the
  * retries), and so is a check whose moment has gone by, or one [nearRegular] says a regular check is close enough to
  * stand in for.
@@ -338,14 +338,15 @@ fun nextReleaseCheck(
             null -> return null
         }
     val today = now.toLocalDate()
-    val retries = RELEASE_RETRY_FOR.dividedBy(RELEASE_RETRY_EVERY)
+    // The checks, as times after the chapter's: each the one before and its gap.
+    val offsets = RELEASE_CHECKS.runningReduce(Duration::plus)
     // From yesterday: a chapter due late in the evening has its checks run on past midnight.
     for (ahead in -1..CHECK_DAYS_AHEAD) {
         val day = today.plusDays(ahead)
         if (!pattern.dueOn(day) || day in released) continue
-        val first = (if (overnight) day.plusDays(1) else day).atTime(out).atZone(now.zone).plus(RELEASE_CHECK_DELAY)
-        for (retry in 0..retries) {
-            val at = first.plus(RELEASE_RETRY_EVERY.multipliedBy(retry))
+        val expected = (if (overnight) day.plusDays(1) else day).atTime(out).atZone(now.zone)
+        for (offset in offsets) {
+            val at = expected.plus(offset)
             if (at.isAfter(now) && !nearRegular(at)) return at
         }
     }
@@ -436,12 +437,11 @@ private fun nextOn(days: List<DayOfWeek>, last: LocalDate, today: LocalDate): Lo
     return next
 }
 
-/** How long after a chapter is expected out its novel is checked: time for a site running a little late. */
-val RELEASE_CHECK_DELAY: Duration = Duration.ofMinutes(30)
-
-/** How often a novel whose chapter wasn't there yet is checked again, and for how long after the first check. */
-val RELEASE_RETRY_EVERY: Duration = Duration.ofMinutes(30)
-val RELEASE_RETRY_FOR: Duration = Duration.ofHours(2)
+/**
+ * A novel's checks for a chapter due out: the first this long after it's expected, each after that this long after the
+ * one before, while it isn't there: 1, 6, 16, 46, 76 and 106 minutes after. Close at first, as most come on the dot.
+ */
+val RELEASE_CHECKS: List<Duration> = listOf(1L, 5, 10, 30, 30, 30).map(Duration::ofMinutes)
 
 /** A release check this close to a regular library check, before or after it, is left to that check. */
 val REGULAR_CHECK_WINDOW: Duration = Duration.ofHours(1)
