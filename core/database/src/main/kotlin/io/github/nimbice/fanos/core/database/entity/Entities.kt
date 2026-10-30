@@ -176,6 +176,10 @@ data class ReleaseSummaryRow(
     val chapters: Int,
     val dated: Int,
     @ColumnInfo(name = "first_added_at") val firstAddedAt: Long?,
+    /** When its chapters were last fetched. */
+    @ColumnInfo(name = "last_checked") val lastChecked: Long? = null,
+    /** Its last check for new chapters failed. */
+    @ColumnInfo(name = "check_failed") val checkFailed: Boolean = false,
 )
 
 /** A chapter's dates, for when a novel's chapters come out: the site's, and when this device first saw it. */

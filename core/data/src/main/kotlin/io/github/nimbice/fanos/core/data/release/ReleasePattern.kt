@@ -73,17 +73,38 @@ fun releaseTimes(chapters: Int, dated: Int, firstAdded: Long?, published: List<L
  */
 fun releaseTime(chapters: List<Chapter>, zone: ZoneId): ReleaseTime? {
     val dated = chapters.mapNotNull { it.publishedAt }
-    if (siteDated(chapters.size, dated.size)) return releaseTime(dated, zone)
-    return estimatedReleaseTime(chapters.mapNotNull { chapter -> chapter.seenAfter?.let { after -> chapter.addedAt?.let { after to it } } }, zone)
+    // A site that dates its chapters without a time of day says nothing of when: the checks may.
+    val site = if (siteDated(chapters.size, dated.size)) releaseTime(dated, zone) else null
+    return site ?: estimatedReleaseTime(checkWindows(chapters), zone)
 }
+
+/** For each chapter found after the novel's first fetch: the check before, that didn't list it, and the one that did. */
+fun checkWindows(chapters: List<Chapter>): List<Pair<Long, Long>> =
+    chapters.mapNotNull { chapter -> chapter.seenAfter?.let { after -> chapter.addedAt?.let { after to it } } }
+
+/** Where the most of a novel's check windows overlap: from [start] minutes into the day, [minutes] long, past midnight perhaps. */
+data class ReleaseRange(val start: Int, val minutes: Int)
 
 /**
  * The time of day chapters come out, estimated from [windows]: for each, the check that didn't find a chapter and the one
  * that did, so it came out in between. Where the most of the last eight weeks' windows overlap, round the clock (three
- * in four of them at least), is when they usually come out, given as a window once that's within four hours. Null when there are too few windows
- * narrow enough to go by, or they don't agree. Chapters found together count once.
+ * in four of them at least), is when they usually come out, given as a window once that's within four hours
+ * ([estimatedReleaseRange], to the half hour). Null when there are too few windows narrow enough to go by, or they don't
+ * agree. Chapters found together count once.
  */
 fun estimatedReleaseTime(windows: Collection<Pair<Long, Long>>, zone: ZoneId): ReleaseTime? {
+    val range = estimatedReleaseRange(windows, zone)?.takeIf { it.minutes <= WINDOW_MINUTES } ?: return null
+    val start = range.start / 30 * 30
+    val end = maxOf((range.start + range.minutes + 29) / 30 * 30, start + 30)
+    return ReleaseTime.Window(clockTime(start), clockTime(end), estimated = true)
+}
+
+/**
+ * Where the most of the last eight weeks' check [windows] overlap, three in four of them at least, however wide: what
+ * [estimatedReleaseTime] goes by, and where [nextProbe] narrows it down. Null with too few windows, or ones that don't
+ * agree.
+ */
+fun estimatedReleaseRange(windows: Collection<Pair<Long, Long>>, zone: ZoneId): ReleaseRange? {
     val last = windows.maxOfOrNull { it.second } ?: return null
     val usable = windows.distinct().filter { (after, at) -> at > after && at - after <= MAX_CHECK_GAP_MS && at > last - WINDOW_DAYS * DAY_MS }
     if (usable.size < MIN_ESTIMATES) return null
@@ -104,10 +125,7 @@ fun estimatedReleaseTime(windows: Collection<Pair<Long, Long>>, zone: ZoneId): R
     val from = starts.single()
     var width = 0
     while (agreed[(from + width) % MINUTES_A_DAY]) width++
-    if (width > WINDOW_MINUTES) return null
-    val start = from / 30 * 30
-    val end = maxOf((from + width + 29) / 30 * 30, start + 30)
-    return ReleaseTime.Window(clockTime(start), clockTime(end), estimated = true)
+    return ReleaseRange(from, width)
 }
 
 /**
@@ -354,6 +372,58 @@ fun nextReleaseCheck(
 }
 
 /**
+ * When to check a novel, to pin down the time of day its chapters come out, while that isn't known to within
+ * [PROBE_UNTIL]: on the next day one is due and isn't out yet, halfway through what's left of [range] (where the checks
+ * so far put it; any time of day, with none) after [lastChecked], the last check, which didn't find it. Each check
+ * halves what's left: found, the day's window ends there; not, the rest starts there. Past halfway already (the phone
+ * was asleep), as soon as may be. Null once what's left is narrow enough, for the release checks and the library
+ * updates to take on, and for a novel with no set day; null too when [regularSoon] says a library update is about to
+ * look anyway, given the probe's time and the end of what's left.
+ */
+fun nextProbe(
+    pattern: ReleasePattern,
+    range: ReleaseRange?,
+    released: Collection<LocalDate>,
+    lastChecked: Long?,
+    now: ZonedDateTime,
+    regularSoon: (at: ZonedDateTime, until: ZonedDateTime) -> Boolean = { _, _ -> false },
+): ZonedDateTime? {
+    if (pattern is ReleasePattern.Between) return null
+    if (range != null && range.minutes <= PROBE_UNTIL.toMinutes()) return null
+    val checked = lastChecked?.let { Instant.ofEpochMilli(it).atZone(now.zone) }
+    val today = now.toLocalDate()
+    // From yesterday: a range that runs past midnight.
+    for (ahead in -1..CHECK_DAYS_AHEAD) {
+        val day = today.plusDays(ahead)
+        if (!pattern.dueOn(day) || day in released) continue
+        val opens = day.atStartOfDay(now.zone).plusMinutes((range?.start ?: 0).toLong())
+        val closes = opens.plusMinutes((range?.minutes ?: MINUTES_A_DAY).toLong())
+        val from = if (checked != null && checked.isAfter(opens)) checked else opens
+        val left = Duration.between(from, closes)
+        if (!closes.isAfter(now) || left <= PROBE_UNTIL) continue
+        val at = from.plus(left.dividedBy(2)).let { if (it.isAfter(now)) it else now.plus(PROBE_LATE) }
+        return at.takeUnless { regularSoon(it, closes) }
+    }
+    return null
+}
+
+/**
+ * Whether a regular library check comes within [window] after [at], before [until], the next at [next] and then every
+ * [every]: a check that halves what's left as well, so a probe ([nextProbe]) just before it can wait for it. One at the
+ * very end of what's left, or after it, tells nothing new: the probe goes ahead.
+ */
+fun regularCheckSoon(at: ZonedDateTime, until: ZonedDateTime, next: Long, every: Long, window: Duration = REGULAR_CHECK_WINDOW): Boolean {
+    val millis = at.toInstant().toEpochMilli()
+    val regular =
+        when {
+            millis <= next -> next
+            every <= 0 -> return false
+            else -> next + Math.floorDiv(millis - next + every - 1, every) * every
+        }
+    return regular - millis <= window.toMillis() && regular < until.toInstant().toEpochMilli()
+}
+
+/**
  * Whether [at] is within [window] of a regular library check, the next at [next] and then every [every]: that check
  * looks at the novel anyway.
  */
@@ -442,6 +512,12 @@ private fun nextOn(days: List<DayOfWeek>, last: LocalDate, today: LocalDate): Lo
  * one before, while it isn't there: 1, 6, 16, 46, 76 and 106 minutes after. Close at first, as most come on the dot.
  */
 val RELEASE_CHECKS: List<Duration> = listOf(1L, 5, 10, 30, 30, 30).map(Duration::ofMinutes)
+
+/** Probing ([nextProbe]) stops once the time a novel's chapters come out is known to within this. */
+val PROBE_UNTIL: Duration = Duration.ofMinutes(30)
+
+/** A probe whose time went by unchecked (the phone asleep, the site down) is tried this long after. */
+private val PROBE_LATE: Duration = Duration.ofMinutes(15)
 
 /** A release check this close to a regular library check, before or after it, is left to that check. */
 val REGULAR_CHECK_WINDOW: Duration = Duration.ofHours(1)

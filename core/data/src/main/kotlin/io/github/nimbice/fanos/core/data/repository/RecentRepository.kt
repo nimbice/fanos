@@ -23,6 +23,8 @@ import io.github.nimbice.fanos.core.data.release.ReleaseTime
 import io.github.nimbice.fanos.core.data.release.releaseTime
 import io.github.nimbice.fanos.core.data.release.siteDated
 import io.github.nimbice.fanos.core.data.release.estimatedReleaseTime
+import io.github.nimbice.fanos.core.data.release.estimatedReleaseRange
+import io.github.nimbice.fanos.core.data.release.ReleaseRange
 
 /** What came in lately (chapters that arrived in library novels) and what was read lately (the novels read, last first). */
 @Singleton
@@ -56,13 +58,20 @@ class RecentRepository @Inject constructor(
                 val rows = times[novel.novelId] ?: return@mapNotNull null
                 val published = rows.mapNotNull { it.publishedAt }.filter { it >= since }
                 val chosen = releaseTimes(novel.chapters, novel.dated, novel.firstAddedAt, published, rows.map { it.addedAt })
-                val time =
-                    if (siteDated(novel.chapters, novel.dated)) {
-                        releaseTime(published, zone)
-                    } else {
-                        estimatedReleaseTime(rows.mapNotNull { row -> row.seenAfter?.let { it to row.addedAt } }, zone)
-                    }
-                NovelReleaseDays(novel.novelId, novel.novelTitle, novel.coverUrl, chosen.map { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() }, time)
+                // The site's own time; else, a site that gives none or dates without one, as the checks have it.
+                val site = if (siteDated(novel.chapters, novel.dated)) releaseTime(published, zone) else null
+                val windows = rows.mapNotNull { row -> row.seenAfter?.let { it to row.addedAt } }
+                NovelReleaseDays(
+                    novel.novelId,
+                    novel.novelTitle,
+                    novel.coverUrl,
+                    chosen.map { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() },
+                    time = site ?: estimatedReleaseTime(windows, zone),
+                    checkRange = if (site == null) estimatedReleaseRange(windows, zone) else null,
+                    timeKnown = site != null,
+                    lastChecked = novel.lastChecked,
+                    checkFailed = novel.checkFailed,
+                )
             }
     }
 
@@ -100,8 +109,22 @@ class RecentRepository @Inject constructor(
     }
 }
 
-/** A library novel, and the days its chapters came out of late. */
-data class NovelReleaseDays(val novelId: Long, val title: String, val coverUrl: String?, val days: List<LocalDate>, val time: ReleaseTime? = null)
+/**
+ * A library novel, and the days its chapters came out of late; the time of day they do, when that's known; where the
+ * checks put it so far ([checkRange]), when the site's own times don't say ([timeKnown]); and its last check for new
+ * chapters, and whether that failed.
+ */
+data class NovelReleaseDays(
+    val novelId: Long,
+    val title: String,
+    val coverUrl: String?,
+    val days: List<LocalDate>,
+    val time: ReleaseTime? = null,
+    val checkRange: ReleaseRange? = null,
+    val timeKnown: Boolean = false,
+    val lastChecked: Long? = null,
+    val checkFailed: Boolean = false,
+)
 
 /** How far back the chapters' dates are looked at for when new ones usually come out: more than the eight weeks used. */
 private const val RELEASE_HISTORY_MS = 120L * 24 * 60 * 60 * 1000

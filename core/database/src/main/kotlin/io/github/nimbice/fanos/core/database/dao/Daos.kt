@@ -301,10 +301,14 @@ interface ChapterDao {
     )
     fun observeRecent(limit: Int): Flow<List<RecentChapterRow>>
 
-    /** Each library novel: how many chapters it has, how many its site dates, and when this device first saw one of them. */
+    /**
+     * Each library novel: how many chapters it has, how many its site dates, when this device first saw one of them, and
+     * its last check for new chapters, and whether that failed.
+     */
     @Query(
         """SELECT n.id AS novel_id, COALESCE(n.custom_title, n.title) AS novel_title, COALESCE(n.custom_cover_url, n.cover_url) AS cover_url,
-             n.status, COUNT(c.id) AS chapters, COUNT(c.published_at) AS dated, MIN(c.added_at) AS first_added_at
+             n.status, COUNT(c.id) AS chapters, COUNT(c.published_at) AS dated, MIN(c.added_at) AS first_added_at,
+             n.chapters_fetched_at AS last_checked, n.update_error IS NOT NULL AS check_failed
            FROM novels n JOIN chapters c ON c.novel_id = n.id
            WHERE n.in_library = 1
            GROUP BY n.id""",
