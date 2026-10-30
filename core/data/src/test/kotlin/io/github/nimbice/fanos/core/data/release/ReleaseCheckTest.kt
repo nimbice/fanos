@@ -28,11 +28,26 @@ class ReleaseCheckTest {
     }
 
     @Test
-    fun `a window is checked a minute after it closes`() {
+    fun `a window is checked from a minute after it opens`() {
         val daily = ReleasePattern.MostDays(everyDay = true)
         val window = ReleaseTime.Window(LocalTime.of(14, 0), LocalTime.of(17, 0), estimated = true)
 
-        assertEquals(at(today, 17, 1), nextReleaseCheck(daily, window, emptyList(), at(today, 9)))
+        assertEquals(at(today, 14, 1), nextReleaseCheck(daily, window, emptyList(), at(today, 9)))
+        // Its start's checks done, its end's.
+        assertEquals(at(today, 17, 1), nextReleaseCheck(daily, window, emptyList(), at(today, 15, 50)))
+    }
+
+    @Test
+    fun `an hour's window, two times an hour apart, is checked from both`() {
+        val thursdays = ReleasePattern.Weekdays(listOf(DayOfWeek.THURSDAY), next = today)
+        val fiveToSix = ReleaseTime.Window(LocalTime.of(5, 0), LocalTime.of(6, 0))
+        val checks = generateSequence(at(today, 0)) { nextReleaseCheck(thursdays, fiveToSix, emptyList(), it.plusSeconds(20)) }
+            .drop(1)
+            .takeWhile { it.toLocalDate() == today }
+            .map { it.toLocalTime() }
+            .toList()
+
+        assertEquals(listOf("05:01", "05:06", "05:16", "05:46", "06:01", "06:06", "06:16", "06:46", "07:16", "07:46").map(LocalTime::parse), checks)
     }
 
     @Test
@@ -40,7 +55,8 @@ class ReleaseCheckTest {
         val daily = ReleasePattern.MostDays(everyDay = true)
         val window = ReleaseTime.Window(LocalTime.of(23, 0), LocalTime.of(1, 0))
 
-        assertEquals(at(today.plusDays(1), 1, 1), nextReleaseCheck(daily, window, emptyList(), at(today, 9)))
+        assertEquals(at(today, 23, 1), nextReleaseCheck(daily, window, emptyList(), at(today, 9)))
+        assertEquals(at(today.plusDays(1), 1, 1), nextReleaseCheck(daily, window, emptyList(), at(today.plusDays(1), 0, 50)))
     }
 
     @Test

@@ -333,12 +333,13 @@ fun ReleasePattern.dueOn(day: LocalDate): Boolean =
     }
 
 /**
- * When to look for a novel's next chapter, going by the time of day its chapters come out (the end of their window) on
- * the next day one is due: a minute after it, then while it isn't there [RELEASE_CHECKS] apart, then it's left to the
- * regular checks. Null when the day or the time can't be told: a novel with
- * no set day, or no [time]. A day already [released] on is passed over (a check that found its chapter ends the
- * retries), and so is a check whose moment has gone by, or one [nearRegular] says a regular check is close enough to
- * stand in for.
+ * When to look for a novel's next chapter, going by the time of day its chapters come out on the next day one is due: a
+ * minute after it, then while it isn't there [RELEASE_CHECKS] apart, then it's left to the regular checks. For a window,
+ * the checks run from its start and again from its end: one that's two times an hour apart (an author abroad, their
+ * clocks changing on another day than this phone's) has its chapter found as soon at the one as at the other. Null when
+ * the day or the time can't be told: a novel with no set day, or no [time]. A day already [released] on is passed over
+ * (a check that found its chapter ends the day's), and so is a check whose moment has gone by, or one [nearRegular]
+ * says a regular check is close enough to stand in for.
  */
 fun nextReleaseCheck(
     pattern: ReleasePattern,
@@ -347,13 +348,14 @@ fun nextReleaseCheck(
     now: ZonedDateTime,
     nearRegular: (ZonedDateTime) -> Boolean = { false },
 ): ZonedDateTime? {
-    if (pattern is ReleasePattern.Between) return null
-    // A window past midnight ends the day after it opens.
-    val (out, overnight) =
+    if (pattern is ReleasePattern.Between || time == null) return null
+    // When the chapter could be out on a day: its one time, or its window's start and end; a window past midnight ends
+    // the day after it opens.
+    fun expected(day: LocalDate): List<ZonedDateTime> =
         when (time) {
-            is ReleaseTime.At -> time.time to false
-            is ReleaseTime.Window -> time.to to (time.to < time.from)
-            null -> return null
+            is ReleaseTime.At -> listOf(day.atTime(time.time).atZone(now.zone))
+            is ReleaseTime.Window ->
+                listOf(day.atTime(time.from).atZone(now.zone), (if (time.to < time.from) day.plusDays(1) else day).atTime(time.to).atZone(now.zone))
         }
     val today = now.toLocalDate()
     // The checks, as times after the chapter's: each the one before and its gap.
@@ -362,11 +364,8 @@ fun nextReleaseCheck(
     for (ahead in -1..CHECK_DAYS_AHEAD) {
         val day = today.plusDays(ahead)
         if (!pattern.dueOn(day) || day in released) continue
-        val expected = (if (overnight) day.plusDays(1) else day).atTime(out).atZone(now.zone)
-        for (offset in offsets) {
-            val at = expected.plus(offset)
-            if (at.isAfter(now) && !nearRegular(at)) return at
-        }
+        val checks = expected(day).flatMap { out -> offsets.map { out.plus(it) } }.distinctBy { it.toInstant() }.sortedBy { it.toInstant() }
+        checks.firstOrNull { it.isAfter(now) && !nearRegular(it) }?.let { return it }
     }
     return null
 }
