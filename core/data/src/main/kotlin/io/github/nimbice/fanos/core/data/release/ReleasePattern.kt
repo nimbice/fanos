@@ -130,7 +130,9 @@ fun estimatedReleaseRange(windows: Collection<Pair<Long, Long>>, zone: ZoneId): 
 
 /**
  * The time of day [times] (the site's own) fall at, going by the last eight weeks': about one time when three in four
- * of them are within half an hour of one another, a window when they're within four hours, else null. Null too when
+ * of them are within half an hour of one another, a window when they're within four hours, else null. The last
+ * [LATEST_AGREE] days' within half an hour of one another go first, though: the time is theirs now, whatever came
+ * before (an author abroad whose clocks changed on another day than the phone's, a new schedule). Null too when
  * the site gives dates without a time (most of them at midnight UTC), or there are too few to go by. When this device
  * first saw a chapter says nothing of its time: it saw it at its next check for new chapters.
  */
@@ -139,7 +141,9 @@ fun releaseTime(times: Collection<Long>, zone: ZoneId): ReleaseTime? {
     val recent = times.filter { it > last - WINDOW_DAYS * DAY_MS }
     if (recent.size < MIN_RELEASES) return null
     if (recent.count { it % DAY_MS == 0L } * 2 >= recent.size) return null
-    val minutes = recent.map { Instant.ofEpochMilli(it).atZone(zone).toLocalTime().let { time -> time.hour * 60 + time.minute } }.sorted()
+    fun minuteOf(time: Long) = Instant.ofEpochMilli(time).atZone(zone).toLocalTime().let { it.hour * 60 + it.minute }
+    latestTime(recent.sorted().groupBy { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() }.values.map { minuteOf(it.first()) })?.let { return it }
+    val minutes = recent.map(::minuteOf).sorted()
     val need = ceil(minutes.size * TIME_SHARE).toInt()
     // Round the clock, as a window may run past midnight: the shortest that holds three in four of them.
     val around = minutes + minutes.map { it + MINUTES_A_DAY }
@@ -150,6 +154,21 @@ fun releaseTime(times: Collection<Long>, zone: ZoneId): ReleaseTime? {
         width <= WINDOW_MINUTES -> ReleaseTime.Window(clockTime(around[start] / 30 * 30), clockTime((around[start + need - 1] + 29) / 30 * 30))
         else -> null
     }
+}
+
+/**
+ * The time the last [LATEST_AGREE] of [days] (each day's first chapter, minutes into the day, oldest first) agree on,
+ * when they're within [STEADY_MINUTES] of one another, round the clock.
+ */
+private fun latestTime(days: List<Int>): ReleaseTime.At? {
+    val latest = days.takeLast(LATEST_AGREE).sorted()
+    if (latest.size < LATEST_AGREE) return null
+    // The biggest gap between them, round the clock: they're all in what's left.
+    val gaps = latest.indices.map { i -> if (i == 0) latest[0] + MINUTES_A_DAY - latest.last() else latest[i] - latest[i - 1] }
+    val widest = gaps.indices.maxBy { gaps[it] }
+    val spread = MINUTES_A_DAY - gaps[widest]
+    if (spread > STEADY_MINUTES) return null
+    return ReleaseTime.At(clockTime(roundTo(latest[widest] + spread / 2, 5)))
 }
 
 /**
@@ -562,6 +581,9 @@ private const val MAX_WINDOW_DAYS = 6
 /** A time of day when this share of the chapters came out within [STEADY_MINUTES] of one another, a window within [WINDOW_MINUTES]. */
 private const val TIME_SHARE = 0.75
 private const val STEADY_MINUTES = 30
+
+/** How many of the latest days' chapters, all at about one time, make that the time now. */
+private const val LATEST_AGREE = 4
 private const val WINDOW_MINUTES = 240
 
 /** Checks for an estimate: at least this many, each pair of checks at most so far apart. */
