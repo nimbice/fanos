@@ -1,6 +1,7 @@
 package io.github.nimbice.fanos.feature.settings
 
 import android.text.format.Formatter
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
@@ -147,13 +149,22 @@ internal fun UpdatesItem(settingUp: Boolean, onSettingUp: (Boolean) -> Unit, mod
                 trailing = { CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp) },
             )
         is UpdateState.Available ->
-            SettingsItem(
-                "Update available",
-                modifier,
-                summary = { Text("${update.update.versionName} · ${Formatter.formatShortFileSize(context, update.update.size)}") },
-                // Check again: the channel may have changed under it (the key removed, test builds no longer followed).
-                trailing = { Row { TextButton(onClick = viewModel::check) { Text("Check again") }; Button(onClick = viewModel::install) { Text("Install") } } },
-            )
+            // Two buttons beside the words left them a sliver of the row, the version and size wrapped a word a line: the
+            // buttons go under them.
+            Column(modifier) {
+                SettingsItem(
+                    "Update available",
+                    summary = { Text("${update.update.versionName} · ${Formatter.formatShortFileSize(context, update.update.size)}") },
+                )
+                Row(
+                    Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                ) {
+                    // Check again: the channel may have changed under it (the key removed, test builds no longer followed).
+                    TextButton(onClick = viewModel::check) { Text("Check again") }
+                    Button(onClick = viewModel::install) { Text("Install") }
+                }
+            }
         is UpdateState.Downloading ->
             SettingsItem(
                 "Downloading ${update.update.versionName}",
