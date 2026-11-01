@@ -306,7 +306,7 @@ class BrowserFetcher @Inject constructor(@ApplicationContext private val context
         return HttpResponse(finalUrl, status, body)
     }
 
-    private fun onCheck(webView: WebView) = CHECK_TITLES.any { webView.title.orEmpty().startsWith(it, ignoreCase = true) }
+    private fun onCheck(webView: WebView) = isCheckTitle(webView.title.orEmpty())
 
     /** Follows the page while a script sends it on to others, which happens soon after it loads or not at all. */
     private suspend fun settle(webView: WebView) {
@@ -409,7 +409,6 @@ class BrowserFetcher @Inject constructor(@ApplicationContext private val context
         /** Headers the browser sets itself; fetch() and page loads ignore or refuse them. */
         val BROWSER_HEADERS = setOf("user-agent", "cookie", "host", "connection", "content-length", "accept-encoding", "origin")
 
-        val CHECK_TITLES = listOf("Just a moment", "Attention Required", "Making sure you")
 
         // What the page was sent as: its HTML, or for JSON and plain text, which the browser wraps in a
         // page of its own (<html><body><pre>…), the text inside.
@@ -424,6 +423,13 @@ class BrowserFetcher @Inject constructor(@ApplicationContext private val context
         fun Request.pageHeaders(): Map<String, String> = headers.filter { (name, _) -> name.lowercase() !in BROWSER_HEADERS }.toMap()
 
         fun HttpResponse.isCheck(): Boolean =
-            ((code == 403 || code == 503) && CHALLENGE_MARKERS.any { body.contains(it, ignoreCase = true) }) || ANUBIS_MARKER in body
+            ((code == 403 || code == 503) && CHALLENGE_MARKERS.any { body.contains(it, ignoreCase = true) }) ||
+                ANUBIS_MARKER in body ||
+                isCheckTitle(PAGE_TITLE.find(body.take(CHECK_HEAD))?.groupValues?.get(1).orEmpty())
+
+        private val PAGE_TITLE = Regex("<title[^>]*>([^<]*)</title>", RegexOption.IGNORE_CASE)
+
+        // A check page's title is in its head, near the start.
+        private const val CHECK_HEAD = 16 * 1024
     }
 }

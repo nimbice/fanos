@@ -65,4 +65,19 @@ class ChallengesTest {
         // Not a page at all: the site's JSON, whatever is in it.
         assertFalse(isChallenge(response(200, "cloudflare", anubisPage, "Content-Type" to "application/json")))
     }
+
+    @Test
+    fun `a check sent as an ordinary page is known by its title`() {
+        val botVerification = "<html><head><title>Bot Verification</title></head><body></body></html>"
+        assertTrue(isChallenge(response(200, "nginx", botVerification, "Content-Type" to "text/html")))
+        assertTrue(isChallenge(response(200, "ddos-guard", "<html><head><title>DDoS-Guard</title></head></html>", "Content-Type" to "text/html")))
+    }
+
+    @Test
+    fun `check titles, and titles that only look like them`() {
+        listOf("Just a moment...", "Bot Verification", "You are being redirected...", "Redirecting...", "Redirecting&hellip;", "Un instant...", "DDoS-Guard", "Making sure you&#39;re not a bot!")
+            .forEach { assertTrue(it, isCheckTitle(it)) }
+        listOf("Redirecting Fate | Novel Index", "Lamp Magus | Chapters » Page 14", "A Moment Too Late", "")
+            .forEach { assertFalse(it, isCheckTitle(it)) }
+    }
 }
