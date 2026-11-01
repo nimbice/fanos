@@ -3,6 +3,8 @@ package io.github.nimbice.fanos.core.network
 import android.content.Context
 import android.webkit.WebSettings
 import android.webkit.WebView
+import androidx.webkit.WebSettingsCompat
+import androidx.webkit.WebViewFeature
 
 /**
  * The user agent the app's browser views and its own requests all go by: the device WebView's, less the marks that
@@ -18,9 +20,16 @@ object BrowserUserAgent {
     fun of(context: Context): String =
         cached ?: (runCatching { WebSettings.getDefaultUserAgent(context) }.getOrNull()?.let(::plain) ?: FALLBACK).also { cached = it }
 
-    /** Gives [view] the user agent. */
+    /**
+     * Gives [view] the user agent, and keeps it from naming the app to sites in an X-Requested-With header, as a view
+     * inside an app does unless told not to: some sites turn such views away (they get an
+     * error page where Chrome gets the site).
+     */
     fun applyTo(view: WebView) {
         view.settings.userAgentString = of(view.context)
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.REQUESTED_WITH_HEADER_ALLOW_LIST)) {
+            WebSettingsCompat.setRequestedWithHeaderOriginAllowList(view.settings, emptySet())
+        }
     }
 
     /** [userAgent] without the marks of a view inside an app. */
