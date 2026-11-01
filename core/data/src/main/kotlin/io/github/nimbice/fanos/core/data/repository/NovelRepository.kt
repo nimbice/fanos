@@ -20,6 +20,7 @@ import io.github.nimbice.fanos.core.model.ChapterGroup
 import io.github.nimbice.fanos.core.model.Novel
 import io.github.nimbice.fanos.core.model.NovelSummary
 import io.github.nimbice.fanos.source.api.ChapterInfo
+import io.github.nimbice.fanos.source.api.NovelSource
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -115,7 +116,21 @@ class NovelRepository @Inject constructor(
      */
     suspend fun refreshChapters(novelId: Long): List<ArrivedChapter> {
         val novel = novels.get(novelId) ?: return emptyList()
-        return store(novel, sources[novel.sourceId].chapterList(novel.url))
+        val source = sources[novel.sourceId]
+        return store(novel, newestChapters(novel, source) ?: source.chapterList(novel.url))
+    }
+
+    /**
+     * The novel's whole list, from the newest chapters where the source can read just those (a page or two of a long
+     * list, not every page) and the stored ones before them. Null when the source can't, the novel has no chapters
+     * stored yet, or the newest don't reach back to a stored one: the whole list is read then.
+     */
+    private suspend fun newestChapters(novel: NovelEntity, source: NovelSource): List<ChapterInfo>? {
+        if (novel.chaptersFetchedAt == null) return null
+        val listed = chapters.all(novel.id).filter { it.removedAt == null }
+        if (listed.isEmpty()) return null
+        val newest = source.newestChapters(novel.url, listed.mapTo(HashSet()) { it.url }) ?: return null
+        return NewestChapterList.whole(listed, newest) { SourceUrls.chapterKey(source, it) }
     }
 
     /** Merges [list], the novel's chapters as its source lists them, into the stored ones, as [refreshChapters] does. */

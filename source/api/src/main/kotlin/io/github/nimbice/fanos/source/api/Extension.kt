@@ -19,7 +19,7 @@ object Extensions {
      * This library's level, recorded in each extension ([META_API_LEVEL]). Every addition raises it, and an
      * extension built against a level needs an app at that level or later, as with Android's API levels.
      */
-    const val API_LEVEL = 8
+    const val API_LEVEL = 9
 
     /** The oldest level the app still loads. It goes up only when a change breaks what older extensions use. */
     const val MIN_API_LEVEL = 1

@@ -70,8 +70,23 @@ interface NovelSource {
     /** The novel's chapters in reading order, first to last. */
     suspend fun chapterList(novelUrl: String): List<ChapterInfo>
 
+    /**
+     * The novel's newest chapters, back as far as one the app already has, for a site that lists a novel's chapters a
+     * page at a time, newest first: a library update then reads a page or two, not every page of a long novel, which a
+     * site may take for a scraper and shut out. [known] holds the addresses of the chapters the app has,
+     * as [chapterList] gave them. Null, as by default, where the source reads the whole list anyway: the app asks for
+     * [chapterList] then. Since API level 9.
+     */
+    suspend fun newestChapters(novelUrl: String, known: Set<String>): NewestChapters? = null
+
     suspend fun chapterPage(chapterUrl: String): ChapterPage
 }
+
+/**
+ * What [NovelSource.newestChapters] read: [chapters] in reading order, the newest last, and whether they're [all] of the
+ * novel's, the first page reached before a known chapter was. Since API level 9.
+ */
+class NewestChapters(val chapters: List<ChapterInfo>, val all: Boolean)
 
 /** What a source's search takes; see [NovelSource.searchBy]. */
 enum class SearchBy { Titles, Creators }

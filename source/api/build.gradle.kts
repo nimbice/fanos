@@ -19,7 +19,7 @@ publishing {
         create<MavenPublication>("sourceApi") {
             groupId = "io.github.nimbice.fanos"
             artifactId = "source-api"
-            version = "1.8.0"
+            version = "1.9.0"
             from(components["java"])
             pom {
                 name.set("Fanos source API")

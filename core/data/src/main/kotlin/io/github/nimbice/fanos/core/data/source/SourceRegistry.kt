@@ -88,6 +88,8 @@ private class BackgroundSource(private val source: NovelSource, private val io: 
 
     override suspend fun chapterList(novelUrl: String) = withContext(io) { source.chapterList(novelUrl) }
 
+    override suspend fun newestChapters(novelUrl: String, known: Set<String>) = withContext(io) { source.newestChapters(novelUrl, known) }
+
     override suspend fun chapterPage(chapterUrl: String) = withContext(io) { source.chapterPage(chapterUrl) }
 }
 
