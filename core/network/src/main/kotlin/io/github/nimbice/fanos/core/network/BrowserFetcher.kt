@@ -409,7 +409,7 @@ class BrowserFetcher @Inject constructor(@ApplicationContext private val context
         /** Headers the browser sets itself; fetch() and page loads ignore or refuse them. */
         val BROWSER_HEADERS = setOf("user-agent", "cookie", "host", "connection", "content-length", "accept-encoding", "origin")
 
-        val CHECK_TITLES = listOf("Just a moment", "Attention Required")
+        val CHECK_TITLES = listOf("Just a moment", "Attention Required", "Making sure you")
 
         // What the page was sent as: its HTML, or for JSON and plain text, which the browser wraps in a
         // page of its own (<html><body><pre>…), the text inside.
@@ -424,6 +424,6 @@ class BrowserFetcher @Inject constructor(@ApplicationContext private val context
         fun Request.pageHeaders(): Map<String, String> = headers.filter { (name, _) -> name.lowercase() !in BROWSER_HEADERS }.toMap()
 
         fun HttpResponse.isCheck(): Boolean =
-            (code == 403 || code == 503) && CHALLENGE_MARKERS.any { body.contains(it, ignoreCase = true) }
+            ((code == 403 || code == 503) && CHALLENGE_MARKERS.any { body.contains(it, ignoreCase = true) }) || ANUBIS_MARKER in body
     }
 }

@@ -48,4 +48,21 @@ class ChallengesTest {
     fun `a check page served with 200 is the page asked for`() {
         assertFalse(isChallenge(response(200, "ddos-guard", checkPage)))
     }
+
+    private val anubisPage =
+        """<!doctype html><html><head><title>Making sure you&#39;re not a bot!</title>
+           <script id="anubis_challenge" type="application/json">{"rules":{"algorithm":"fast","difficulty":4}}</script>
+           </head><body><h1>Making sure you&#39;re not a bot!</h1></body></html>"""
+
+    @Test
+    fun `anubis, in front of Royal Road, sends its check as an ordinary page`() {
+        assertTrue(isChallenge(response(200, "cloudflare", anubisPage, "Content-Type" to "text/html; charset=utf-8")))
+    }
+
+    @Test
+    fun `an ordinary page is not a challenge`() {
+        assertFalse(isChallenge(response(200, "cloudflare", "<html><title>The Lamplit Archive</title></html>", "Content-Type" to "text/html")))
+        // Not a page at all: the site's JSON, whatever is in it.
+        assertFalse(isChallenge(response(200, "cloudflare", anubisPage, "Content-Type" to "application/json")))
+    }
 }
