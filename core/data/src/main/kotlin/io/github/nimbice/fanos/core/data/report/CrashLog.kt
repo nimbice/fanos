@@ -8,6 +8,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.nimbice.fanos.core.common.AppIdentity
 import io.github.nimbice.fanos.core.common.Dispatcher
 import io.github.nimbice.fanos.core.common.MemoryLedger
+import io.github.nimbice.fanos.core.data.notification.DiagnosticsNotifier
 import io.github.nimbice.fanos.core.common.ReaderDispatchers
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
@@ -30,6 +31,7 @@ class CrashLog @Inject constructor(
     @ApplicationContext private val context: Context,
     private val identity: AppIdentity,
     private val memory: MemoryGuard,
+    private val notifier: DiagnosticsNotifier,
     @Dispatcher(ReaderDispatchers.IO) private val io: CoroutineDispatcher,
 ) {
     private val file = File(context.filesDir, "crash/last-crash.txt")
@@ -87,12 +89,14 @@ class CrashLog @Inject constructor(
                     val note = memory.lastNote()?.let { "\n\nWhen memory last ran high: $it" }.orEmpty()
                     file.writeText(report("?", "Fanos crashed, but the crash couldn't be written down as it happened.$note", outOfMemory = false, at = exit.timestamp))
                     file.setLastModified(exit.timestamp)
+                    notifier.show(DiagnosticsNotifier.Kind.Closed, "Fanos crashed earlier", "It couldn't write down why as it happened; what Android kept is in Settings → About.")
                 }
             ApplicationExitInfo.REASON_ANR -> {
                 // Where every thread was, the main one first: the main one is what wasn't responding.
                 val trace = exit.traceInputStream?.use { input -> String(ByteArray(TRACE_BYTES).let { it.copyOf(input.readInto(it)) }) } ?: "(no trace kept)"
                 file.writeText(report("main", "Fanos stopped responding (${exit.description}).\n\n$trace", outOfMemory = false, at = exit.timestamp))
                 file.setLastModified(exit.timestamp)
+                notifier.show(DiagnosticsNotifier.Kind.Closed, "Fanos stopped responding earlier", "Android closed it. Where it was stuck is in Settings → About.")
             }
         }
     }

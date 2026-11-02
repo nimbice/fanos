@@ -13,6 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import io.github.nimbice.fanos.core.data.notification.BackupNotifier
+import io.github.nimbice.fanos.core.data.notification.DiagnosticsNotifier
 import io.github.nimbice.fanos.core.data.notification.DownloadNotifier
 import io.github.nimbice.fanos.core.data.notification.NewChapterNotifier
 import io.github.nimbice.fanos.core.data.repository.SettingsRepository
@@ -105,6 +106,7 @@ class MainActivity : ComponentActivity() {
             intent.getBooleanExtra(NewChapterNotifier.EXTRA_NEW_CHAPTERS, false) -> links.trySend(AppLink.NewChapters)
             intent.getBooleanExtra(DownloadNotifier.EXTRA_DOWNLOADS, false) -> links.trySend(AppLink.Downloads)
             intent.getBooleanExtra(BackupNotifier.EXTRA_SETTINGS, false) -> links.trySend(AppLink.Backup)
+            intent.getBooleanExtra(DiagnosticsNotifier.EXTRA_ABOUT, false) -> links.trySend(AppLink.About)
             intent.getBooleanExtra(UpdateNotifier.EXTRA_UPDATES, false) -> links.trySend(AppLink.AppUpdates)
             intent.getBooleanExtra(UpdateNotifier.EXTRA_EXTENSIONS, false) -> links.trySend(AppLink.Extensions)
         }

@@ -117,6 +117,9 @@ sealed interface AppLink {
 
     /** The extensions, which have updates. */
     data object Extensions : AppLink
+
+    /** About, with what was saved of a problem, as a diagnostics notification asks. */
+    data object About : AppLink
 }
 
 /** To a tab: each keeps where it was left, and Back from any of them goes to the library. */
@@ -171,6 +174,7 @@ fun FanosApp(links: Flow<AppLink> = emptyFlow(), frame: FrameViewModel = hiltVie
                 AppLink.Downloads -> navController.navigateToTopLevel(DownloadsRoute)
                 AppLink.Backup -> showSettingsTopic(SettingsTopic.Backup)
                 AppLink.AppUpdates -> showSettingsTopic(SettingsTopic.Updates)
+                AppLink.About -> showSettingsTopic(SettingsTopic.About)
                 AppLink.Extensions -> {
                     navController.navigateToTopLevel(SourcesRoute)
                     navController.currentBackStackEntry?.savedStateHandle?.set(SourcesRoute.SHOW_EXTENSIONS, true)

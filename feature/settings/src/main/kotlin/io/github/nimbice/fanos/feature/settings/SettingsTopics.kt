@@ -433,6 +433,31 @@ private fun AboutSettings(versionName: String, viewModel: SettingsViewModel, onO
             }
         }
     }
+    // Times memory ran high, and what held it: nothing leaves the device unless the reader shares it.
+    val incidents by viewModel.memoryIncidents.collectAsStateWithLifecycle()
+    incidents.firstOrNull()?.let { latest ->
+        SettingsGroup {
+            item {
+                SettingsItem(
+                    "Memory ran high ${ago(context, latest.at)}",
+                    summary = {
+                        val times = if (incidents.size > 1) " (${incidents.size} times kept)" else ""
+                        Text("Fanos used far more memory than usual$times. Share the details to help find out why. They say what was holding memory and what was running, nothing you read.")
+                    },
+                    trailing = {
+                        Row {
+                            TextButton(onClick = viewModel::clearMemoryIncidents) { Text("Clear") }
+                            OutlinedButton(onClick = {
+                                val text = incidents.joinToString("\n\n---\n\n") { it.text }
+                                val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_SUBJECT, "Fanos memory report").putExtra(Intent.EXTRA_TEXT, text)
+                                context.startActivity(Intent.createChooser(send, null))
+                            }) { Text("Share") }
+                        }
+                    },
+                )
+            }
+        }
+    }
     SettingsGroup {
         item {
             SettingsItem(

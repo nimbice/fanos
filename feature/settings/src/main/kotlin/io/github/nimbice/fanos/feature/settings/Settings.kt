@@ -74,6 +74,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import io.github.nimbice.fanos.core.data.report.CrashLog
 import io.github.nimbice.fanos.core.data.report.CrashReport
+import io.github.nimbice.fanos.core.data.report.MemoryGuard
+import io.github.nimbice.fanos.core.data.report.MemoryIncident
 
 /** Settings: a line for each topic, opening the topic's own page. */
 @Serializable
@@ -104,6 +106,7 @@ class SettingsViewModel @Inject constructor(
     private val downloads: DownloadRepository,
     private val siteData: SiteData,
     private val crashLog: CrashLog,
+    private val memoryGuard: MemoryGuard,
 ) : ViewModel() {
 
     private val _lastCrash = MutableStateFlow<CrashReport?>(null)
@@ -111,14 +114,27 @@ class SettingsViewModel @Inject constructor(
     /** The last crash's report, kept for About, until cleared. */
     val lastCrash: StateFlow<CrashReport?> = _lastCrash.asStateFlow()
 
+    private val _memoryIncidents = MutableStateFlow<List<MemoryIncident>>(emptyList())
+
+    /** The times memory ran high that are kept, newest first, for About, until cleared. */
+    val memoryIncidents: StateFlow<List<MemoryIncident>> = _memoryIncidents.asStateFlow()
+
     init {
         viewModelScope.launch { _lastCrash.value = crashLog.last() }
+        viewModelScope.launch { _memoryIncidents.value = memoryGuard.incidents() }
     }
 
     fun clearCrash() {
         viewModelScope.launch {
             crashLog.clear()
             _lastCrash.value = null
+        }
+    }
+
+    fun clearMemoryIncidents() {
+        viewModelScope.launch {
+            memoryGuard.clear()
+            _memoryIncidents.value = emptyList()
         }
     }
 
