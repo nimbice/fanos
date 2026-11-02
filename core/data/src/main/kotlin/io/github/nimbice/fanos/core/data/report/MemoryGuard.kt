@@ -37,6 +37,9 @@ class MemoryGuard @Inject constructor(
 ) {
     private val notes = File(context.filesDir, "crash/memory")
     private val heaps = context.getExternalFilesDir(null)
+
+    // The notes again where adb can read them (Android/data/<app>/files/memory), as it can't the app's own files.
+    private val shared = context.getExternalFilesDir("memory")
     private val testBuild = "-test" in identity.versionName
     private val version = identity.versionName
 
@@ -58,9 +61,11 @@ class MemoryGuard @Inject constructor(
             if (report != null) parts.append(report)
             runCatching {
                 notes.mkdirs()
-                file.writeText("${WHEN.format(Date(at))} · Fanos $version\nHighest: ${peak shr 20} MB of ${Runtime.getRuntime().maxMemory() shr 20} MB\n\n$parts")
-                file.setLastModified(at)
-                prune(notes.listFiles { f -> f.name.endsWith(".txt") }, KEEP_NOTES)
+                val text = "${WHEN.format(Date(at))} · Fanos $version\nHighest: ${peak shr 20} MB of ${Runtime.getRuntime().maxMemory() shr 20} MB\n\n$parts"
+                for (dir in listOfNotNull(notes, shared)) {
+                    File(dir, file.name).apply { writeText(text); setLastModified(at) }
+                    prune(dir.listFiles { f -> f.name.endsWith(".txt") }, KEEP_NOTES)
+                }
             }
         }
 
@@ -154,6 +159,7 @@ class MemoryGuard @Inject constructor(
     suspend fun clear() {
         withContext(io) {
             notes.listFiles().orEmpty().forEach { it.delete() }
+            shared?.listFiles().orEmpty().forEach { it.delete() }
             heaps?.listFiles { f -> f.name.startsWith("high-memory-") }.orEmpty().forEach { it.delete() }
         }
     }

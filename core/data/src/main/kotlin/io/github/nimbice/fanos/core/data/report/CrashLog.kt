@@ -36,6 +36,9 @@ class CrashLog @Inject constructor(
 ) {
     private val file = File(context.filesDir, "crash/last-crash.txt")
 
+    // The report again where adb can read it (Android/data/<app>/files/crash), as it can't the app's own files.
+    private val shared = context.getExternalFilesDir("crash")?.let { File(it, "last-crash.txt") }
+
     // The last time the app closed that's been looked at, so it isn't reported twice.
     private val seenExit = File(context.filesDir, "crash/seen-exit.txt")
 
@@ -49,10 +52,7 @@ class CrashLog @Inject constructor(
             // Out of memory: what can go goes first, for room to write the report in.
             val outOfMemory = error is OutOfMemoryError
             if (outOfMemory) runCatching { MemoryLedger.shed() }
-            runCatching {
-                file.parentFile?.mkdirs()
-                file.writeText(report(thread.name, error.stackTraceToString(), outOfMemory))
-            }
+            runCatching { write(report(thread.name, error.stackTraceToString(), outOfMemory)) }
             before?.uncaughtException(thread, error)
         }
         runCatching { lastExit() }
@@ -71,6 +71,15 @@ class CrashLog @Inject constructor(
             }
         }
 
+    /** Writes the report, here and where adb can read it, dated [at] (now, unless said). */
+    private fun write(text: String, at: Long? = null) {
+        for (target in listOfNotNull(file, shared)) {
+            target.parentFile?.mkdirs()
+            target.writeText(text)
+            at?.let(target::setLastModified)
+        }
+    }
+
     /** How the app last closed, if it crashed without a report or stopped responding. */
     private fun lastExit() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
@@ -87,15 +96,13 @@ class CrashLog @Inject constructor(
             ApplicationExitInfo.REASON_CRASH ->
                 if (!file.exists() || file.lastModified() < exit.timestamp - SLACK_MS) {
                     val note = memory.lastNote()?.let { "\n\nWhen memory last ran high: $it" }.orEmpty()
-                    file.writeText(report("?", "Fanos crashed, but the crash couldn't be written down as it happened.$note", outOfMemory = false, at = exit.timestamp))
-                    file.setLastModified(exit.timestamp)
+                    write(report("?", "Fanos crashed, but the crash couldn't be written down as it happened.$note", outOfMemory = false, at = exit.timestamp), exit.timestamp)
                     notifier.show(DiagnosticsNotifier.Kind.Closed, "Fanos crashed earlier", "It couldn't write down why as it happened; what Android kept is in Settings → About.")
                 }
             ApplicationExitInfo.REASON_ANR -> {
                 // Where every thread was, the main one first: the main one is what wasn't responding.
                 val trace = exit.traceInputStream?.use { input -> String(ByteArray(TRACE_BYTES).let { it.copyOf(input.readInto(it)) }) } ?: "(no trace kept)"
-                file.writeText(report("main", "Fanos stopped responding (${exit.description}).\n\n$trace", outOfMemory = false, at = exit.timestamp))
-                file.setLastModified(exit.timestamp)
+                write(report("main", "Fanos stopped responding (${exit.description}).\n\n$trace", outOfMemory = false, at = exit.timestamp), exit.timestamp)
                 notifier.show(DiagnosticsNotifier.Kind.Closed, "Fanos stopped responding earlier", "Android closed it. Where it was stuck is in Settings → About.")
             }
         }
@@ -126,6 +133,6 @@ class CrashLog @Inject constructor(
     }
 
     suspend fun clear() {
-        withContext(io) { file.delete() }
+        withContext(io) { listOfNotNull(file, shared).forEach { it.delete() } }
     }
 }
