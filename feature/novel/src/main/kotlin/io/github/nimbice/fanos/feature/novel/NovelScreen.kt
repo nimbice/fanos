@@ -489,8 +489,8 @@ fun NovelScreen(
                                 )
                             }
                         }
-                        val today = LocalDate.now()
-                        val zone = ZoneId.systemDefault()
+                        val today = now.toLocalDate()
+                        val zone = now.zone
                         items(shown, key = { it.id }) { chapter ->
                             val isFound = chapter.id == found?.id
                             ChapterRow(
