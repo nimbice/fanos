@@ -2,6 +2,7 @@ package io.github.nimbice.fanos.feature.reader
 
 import androidx.lifecycle.SavedStateHandle
 import io.github.nimbice.fanos.core.common.MemoryLedger
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
@@ -460,10 +461,19 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
-    /** Loads chapter [id] for the reading view, unless it's there or on its way. */
+    /**
+     * Loads chapter [id] for the reading view, unless it's there or on its way, or too far from the one being read: no
+     * more than [KEEP_AROUND] chapters either side are ever loaded, whatever the view asks for. (Page mode once asked
+     * for the chapter before each it was shown, on and on back to the novel's first, and ran out of memory.) One
+     * further off is loaded once the reader comes near it.
+     */
     fun need(id: Long) {
         val page = _state.value.page as? ReaderPage.Ready ?: return
         if (id in page.loaded || fetching[id]?.isActive == true) return
+        if (!withinReach(page.chapterIds, chapterId, id, KEEP_AROUND)) {
+            Log.w(TAG, "Not loading chapter $id, ${page.chapterIds.indexOf(id) - page.chapterIds.indexOf(chapterId)} chapters from $chapterId being read")
+            return
+        }
         updatePage { it.copy(failed = it.failed - id) }
         fetching[id] =
             viewModelScope.launch {
@@ -615,6 +625,8 @@ class ReaderViewModel @Inject constructor(
         /** How many chapters either side of the one being read are kept loaded. */
         const val KEEP_AROUND = 2
 
+        private const val TAG = "FanosReader"
+
         const val TICK_MS = 15_000L
 
         /** No scrolling, page turns or taps for this long, and the reader is taken to be away. */
@@ -623,3 +635,11 @@ class ReaderViewModel @Inject constructor(
 }
 
 private const val HOUR_MS = 60L * 60 * 1000
+
+/** Whether chapter [id] is no more than [keep] chapters of [ids] either side of [reading]: one not listed is too far. */
+internal fun withinReach(ids: List<Long>, reading: Long, id: Long, keep: Int): Boolean {
+    if (id == reading) return true
+    val at = ids.indexOf(reading)
+    val to = ids.indexOf(id)
+    return at >= 0 && to >= 0 && kotlin.math.abs(to - at) <= keep
+}
