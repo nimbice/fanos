@@ -1,6 +1,7 @@
 package io.github.nimbice.fanos.core.network
 
 import android.annotation.SuppressLint
+import io.github.nimbice.fanos.core.common.MemoryLedger
 import android.content.Context
 import android.graphics.Bitmap
 import android.os.SystemClock
@@ -114,7 +115,7 @@ class BrowserFetcher @Inject constructor(@ApplicationContext private val context
                     release?.cancel()
                     try {
                         val webView = view ?: create().also { view = it }
-                        val response = request(webView, request)
+                        val response = MemoryLedger.during("hidden browser: fetching a page") { request(webView, request) }
                         if (response.isCheck()) throw ChallengeRequiredException(response.url)
                         if (response.code >= 400) throw HttpStatusException(response.url, response.code)
                         response
@@ -145,7 +146,7 @@ class BrowserFetcher @Inject constructor(@ApplicationContext private val context
                 release?.cancel()
                 try {
                     val webView = view ?: create().also { view = it }
-                    val response = read(webView, url, emptyMap(), url.toHttpUrl().root(), rendering = true)
+                    val response = MemoryLedger.during("hidden browser: opening a page") { read(webView, url, emptyMap(), url.toHttpUrl().root(), rendering = true) }
                     if (response.code >= 400) throw HttpStatusException(response.url, response.code)
                     response
                 } finally {

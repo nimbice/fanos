@@ -46,8 +46,13 @@ internal class RowMeasurer(
 ) {
     private val style get() = geometry.style
 
-    fun chapter(rows: ChapterRows, imageSizes: Map<String, IntSize>): ChapterHeights =
-        ChapterHeights(IntArray(rows.rows.size) { i -> height(rows.rows[i], if (i == rows.rows.lastIndex) rows.end else null, imageSizes) })
+    fun chapter(rows: ChapterRows, imageSizes: Map<String, IntSize>, check: () -> Unit = {}): ChapterHeights =
+        ChapterHeights(
+            IntArray(rows.rows.size) { i ->
+                check()
+                height(rows.rows[i], if (i == rows.rows.lastIndex) rows.end else null, imageSizes)
+            },
+        )
 
     /** The row's height in pixels, [end] being the space after it when it ends its chapter. */
     fun height(row: Row, end: Float?, imageSizes: Map<String, IntSize>): Int {
@@ -106,10 +111,12 @@ internal class RowMeasurer(
     /**
      * The chapter's rows as page mode cuts them (see [Paginator]): each row's height without the
      * space scroll mode leaves after a chapter, where a page may end in it (between its lines, or a
-     * table's rows), and what reading position a page starting part way down it starts at.
+     * table's rows), and what reading position a page starting part way down it starts at. [check] is called
+     * before each row, and throws to stop.
      */
-    fun spans(rows: ChapterRows, imageSizes: Map<String, IntSize>): List<RowSpan> =
+    fun spans(rows: ChapterRows, imageSizes: Map<String, IntSize>, check: () -> Unit = {}): List<RowSpan> =
         rows.rows.map { row ->
+            check()
             val top = px(geometry.contentTop(row))
             val height = height(row, null, imageSizes)
             val layout = layout(row)

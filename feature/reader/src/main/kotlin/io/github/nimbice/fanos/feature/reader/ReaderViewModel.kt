@@ -1,6 +1,7 @@
 package io.github.nimbice.fanos.feature.reader
 
 import androidx.lifecycle.SavedStateHandle
+import io.github.nimbice.fanos.core.common.MemoryLedger
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
@@ -257,6 +258,17 @@ class ReaderViewModel @Inject constructor(
 
     // Chapters on their way in.
     private val fetching = mutableMapOf<Long, Job>()
+
+    // What the reader holds, for the memory guard to tell of.
+    private val held =
+        MemoryLedger.hold("reader") {
+            val page = _state.value.page as? ReaderPage.Ready ?: return@hold "no chapter open"
+            "${page.loaded.size} chapters loaded, ${page.loaded.values.sumOf { loaded -> loaded.content.leaves.sumOf { it.text().length } }} characters"
+        }
+
+    override fun onCleared() {
+        held.close()
+    }
 
     /** The chapter being read; kept in saved state so the reader reopens on it after process death. */
     private var chapterId: Long

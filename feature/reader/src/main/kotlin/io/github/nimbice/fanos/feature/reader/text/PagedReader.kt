@@ -74,6 +74,8 @@ import java.io.File
 import kotlinx.coroutines.flow.distinctUntilChanged
 import io.github.nimbice.fanos.core.model.ReadingPosition
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
+import io.github.nimbice.fanos.core.common.MemoryLedger
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -178,18 +180,33 @@ internal fun PagedReader(
         // The loaded chapters cut into pages, the one being read first; again when the text or the
         // screen changes, or an image turns out another size.
         LaunchedEffect(page.loaded, layout, images) {
+            // A screen not laid out yet (a moment as the app starts) has no room for a page: none are cut for it, or a
+            // chapter would be cut into thousands of slivers. They're cut once the screen has its size.
+            if (pageHeight < MIN_PAGE_PX) return@LaunchedEffect
             val sizes = imageSizes.toMap()
             for ((id, chapter) in page.loaded.entries.sortedBy { if (it.key == reading.longValue) 0 else 1 }) {
                 val done = paginated[id]
                 if (done != null && done.content === chapter.content && done.layout == layout && done.images == images) continue
                 val pages =
-                    withContext(Dispatchers.Default) {
-                        val measurer = RowMeasurer(geometry, TextMeasurer(fontResolver, density, layoutDirection, 0), density, layout.pageWidth)
-                        Paginator.paginate(measurer.spans(rowsOf(chapter), sizes), pageHeight)
+                    MemoryLedger.during("page mode: cutting chapter $id into pages") {
+                        withContext(Dispatchers.Default) {
+                            val measurer = RowMeasurer(geometry, TextMeasurer(fontResolver, density, layoutDirection, 0), density, layout.pageWidth)
+                            // Stopped as soon as it's not wanted (cut again for another size, say), not left to finish.
+                            Paginator.paginate(measurer.spans(rowsOf(chapter), sizes) { ensureActive() }, pageHeight)
+                        }
                     }
                 paginated[id] = Paginated(chapter.content, layout, images, pages)
             }
             paginated.keys.retainAll(page.loaded.keys)
+        }
+        DisposableEffect(Unit) {
+            val entry =
+                MemoryLedger.hold("page mode") {
+                    paginated.entries.joinToString(prefix = "${paginated.size} chapters cut: ") { (id, done) ->
+                        "$id into ${done.pages.count} pages, ${done.pages.pages.sumOf { it.slices.size }} slices"
+                    }
+                }
+            onDispose { entry.close() }
         }
 
         // The row of pages: the loaded chapters' pages, with a stand-in for a chapter either side of
@@ -556,6 +573,9 @@ private fun PageView(
         }
     }
 }
+
+/** The least room for a page that pages are cut for, in pixels: a few lines. */
+private const val MIN_PAGE_PX = 120
 
 /** Space between the system bars and the text, above and below it. */
 private val PAGE_PADDING = 16.dp

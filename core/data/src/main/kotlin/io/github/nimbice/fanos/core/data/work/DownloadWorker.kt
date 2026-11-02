@@ -1,6 +1,7 @@
 package io.github.nimbice.fanos.core.data.work
 
 import android.content.Context
+import io.github.nimbice.fanos.core.common.MemoryLedger
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
@@ -25,7 +26,9 @@ class DownloadWorker @AssistedInject constructor(
 
     private var foreground = true
 
-    override suspend fun doWork(): Result {
+    override suspend fun doWork(): Result = MemoryLedger.during("downloading chapters") { work() }
+
+    private suspend fun work(): Result {
         show(notifier.foregroundInfo(null))
         try {
             val outcome = downloader.run { progress -> show(notifier.foregroundInfo(progress)) }

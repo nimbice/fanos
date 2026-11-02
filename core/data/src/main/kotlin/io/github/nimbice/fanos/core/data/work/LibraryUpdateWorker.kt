@@ -1,6 +1,7 @@
 package io.github.nimbice.fanos.core.data.work
 
 import android.app.NotificationChannel
+import io.github.nimbice.fanos.core.common.MemoryLedger
 import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.ServiceInfo
@@ -34,7 +35,9 @@ class LibraryUpdateWorker @AssistedInject constructor(
     private val widgets: Widgets,
 ) : CoroutineWorker(context, params) {
 
-    override suspend fun doWork(): Result {
+    override suspend fun doWork(): Result = MemoryLedger.during("library update") { work() }
+
+    private suspend fun work(): Result {
         val found = mutableListOf<NovelUpdate>()
         try {
             // How it's going is the repository's to tell (LibraryRepository.progress): novel by novel, more than work data holds.

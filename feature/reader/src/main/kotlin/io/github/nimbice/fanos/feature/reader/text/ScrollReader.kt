@@ -1,6 +1,8 @@
 package io.github.nimbice.fanos.feature.reader.text
 
 import androidx.compose.foundation.focusable
+import io.github.nimbice.fanos.core.common.MemoryLedger
+import kotlinx.coroutines.ensureActive
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
@@ -244,7 +246,10 @@ internal fun ScrollReader(
                 val onScreen = currentId()
                 for (id in page.loaded.keys.sortedBy { if (it == onScreen) 0 else 1 }) {
                     val chapter = currentPage.loaded[id] ?: continue
-                    measured[id] = withContext(Dispatchers.Default) { measurer().chapter(rowsOf(chapter), sizes) }
+                    measured[id] =
+                        MemoryLedger.during("scroll mode: measuring chapter $id") {
+                            withContext(Dispatchers.Default) { measurer().chapter(rowsOf(chapter), sizes) { ensureActive() } }
+                        }
                 }
                 measured.keys.retainAll(page.loaded.keys)
             }

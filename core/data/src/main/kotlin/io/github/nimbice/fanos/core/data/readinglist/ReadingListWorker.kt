@@ -1,6 +1,7 @@
 package io.github.nimbice.fanos.core.data.readinglist
 
 import android.content.Context
+import io.github.nimbice.fanos.core.common.MemoryLedger
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
@@ -15,7 +16,9 @@ class ReadingListWorker @AssistedInject constructor(
     private val sync: ReadingListSync,
 ) : CoroutineWorker(context, params) {
 
-    override suspend fun doWork(): Result {
+    override suspend fun doWork(): Result = MemoryLedger.during("reading list sync") { work() }
+
+    private suspend fun work(): Result {
         val everything = inputData.getStringArray(KEY_EVERYTHING)?.toSet().orEmpty()
         return when {
             sync.run(everything) -> Result.success()

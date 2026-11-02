@@ -21,6 +21,8 @@ import io.github.nimbice.fanos.core.updater.UpdateScheduler
 import okhttp3.OkHttpClient
 import javax.inject.Inject
 import io.github.nimbice.fanos.core.data.report.CrashLog
+import io.github.nimbice.fanos.core.data.report.MemoryGuard
+import io.github.nimbice.fanos.core.common.MemoryLedger
 
 @HiltAndroidApp
 class FanosApplication : Application(), Configuration.Provider, SingletonImageLoader.Factory {
@@ -47,9 +49,12 @@ class FanosApplication : Application(), Configuration.Provider, SingletonImageLo
 
     @Inject lateinit var crashLog: CrashLog
 
+    @Inject lateinit var memoryGuard: MemoryGuard
+
     override fun onCreate() {
         super.onCreate()
         crashLog.install()
+        memoryGuard.start()
         // Loading takes a moment; started now, the sources are ready by the time anything asks.
         extensions.start()
         waitingNovels.start()
@@ -71,4 +76,10 @@ class FanosApplication : Application(), Configuration.Provider, SingletonImageLo
             .components { add(OkHttpNetworkFetcherFactory(callFactory = { okHttpClient.get() })) }
             .crossfade(true)
             .build()
+            .also { loader ->
+                // Covers and pictures kept in memory: let go of when memory runs short, as they can be loaded again.
+                MemoryLedger.hold("images in memory", shed = { loader.memoryCache?.clear() }) {
+                    loader.memoryCache?.let { "${it.size shr 20} MB of ${it.maxSize shr 20} MB" } ?: "none kept"
+                }
+            }
 }

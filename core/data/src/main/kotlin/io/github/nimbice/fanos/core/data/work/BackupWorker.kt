@@ -1,6 +1,7 @@
 package io.github.nimbice.fanos.core.data.work
 
 import android.content.Context
+import io.github.nimbice.fanos.core.common.MemoryLedger
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
@@ -20,7 +21,9 @@ class BackupWorker @AssistedInject constructor(
     private val notifier: BackupNotifier,
 ) : CoroutineWorker(context, params) {
 
-    override suspend fun doWork(): Result {
+    override suspend fun doWork(): Result = MemoryLedger.during("backup") { work() }
+
+    private suspend fun work(): Result {
         if (backups.status.first().folder == null && !backups.hasDefaultFolder) return Result.success()
         return suspendRunCatching { backups.backUpToFolderIfDue() }.fold(
             onSuccess = { Result.success() },
