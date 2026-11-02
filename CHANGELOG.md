@@ -3,6 +3,19 @@
 What changed in each release of Fanos, newest first. The newest is always on the
 [releases page](https://github.com/nimbice/fanos/releases/latest).
 
+## 0.1.7 (2026-11-02)
+
+- Fixed: in page mode the reader could load chapter after chapter by itself until it ran out of memory and closed, sometimes seeming to freeze on a page turn first. It now never loads more than two chapters either side of the one you're reading.
+- Novels with a regular schedule are checked for their next chapter from a minute after it's due, several times over the next two hours, so it turns up soon after it's out. Checks close to the regular library update are left to that.
+- For sites that give no release times, Fanos narrows down the time with a few extra checks a day, and checks a release window from its start and again from its end.
+- This week and a novel's page say how many hours away the next chapter is when it's due within a day ("about 5 hours from now").
+- A novel's chapter list shows how long ago each chapter came out ("Oct 12, 2026 · 16 days ago").
+- Library updates can read just a novel's newest chapters, with extensions that support it, instead of its whole chapter list, so long novels update faster and ask less of the site.
+- Bot-check pages that some sites send as ordinary pages are recognised, and open in the browser to be passed.
+- The in-app browser no longer tells sites that it's Fanos.
+- Settings › Updates: an available update's buttons sit under its version instead of squeezed beside it.
+- If Fanos ever uses far more memory than it should, it notes what was holding it and lets go of what it can. Settings › About keeps a short report to share, and a crash, or Android closing Fanos for not responding, leaves one there too. Nothing leaves your phone unless you share it.
+
 ## 0.1.6 (2026-10-28)
 
 - In dark mode the library, settings, browse, downloads and the bottom bar are now pure black, made for AMOLED screens. Cards and panels keep their warm tint, so they still stand out.

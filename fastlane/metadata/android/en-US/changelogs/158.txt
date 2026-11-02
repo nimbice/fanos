@@ -1,0 +1,3 @@
+• Fixed: in page mode the reader could load chapter after chapter by itself until it ran out of memory and closed, sometimes seeming to freeze on a page turn first. It now never loads more than two chapters either side of the one you're reading.
+• Novels with a regular schedule are checked for their next chapter from a minute after it's due, several times over the next two hours, so it turns up soon after it's out. Checks close to the regular library update are left to that.
+• For sites that…
