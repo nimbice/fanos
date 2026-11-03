@@ -66,6 +66,7 @@ import io.github.nimbice.fanos.feature.reader.ReaderCommand
 import io.github.nimbice.fanos.feature.reader.ReaderController
 import io.github.nimbice.fanos.feature.reader.ReaderEvent
 import io.github.nimbice.fanos.feature.reader.ReaderPage
+import io.github.nimbice.fanos.feature.reader.withinReach
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
@@ -512,7 +513,13 @@ internal fun PagedReader(
                             browserLabel = browserLabel(error),
                         )
                     else -> {
-                        LaunchedEffect(ref.chapterId) { onNeed(ref.chapterId) }
+                        // Only for the chapter just before or after the one being read. A chapter coming in before it puts
+                        // a stand-in in front of the row and moves every page's number on, and for a moment the pager lays
+                        // out the pages at the old numbers: the new stand-in at the front among them. Were it to ask for its
+                        // chapter, that one coming in would put the next in front, and so on back through the novel.
+                        if (withinReach(page.chapterIds, reading.longValue, ref.chapterId, keep = 1)) {
+                            LaunchedEffect(ref.chapterId) { onNeed(ref.chapterId) }
+                        }
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = style.colors.text) }
                     }
                 }
