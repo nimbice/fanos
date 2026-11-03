@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
@@ -1259,7 +1260,7 @@ private fun ReaderBottomBar(
         Column(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.navigationBars)) {
             Row(Modifier.padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onPrevious, enabled = hasPrevious) {
-                    Icon(ReaderIcons.SkipPrevious, contentDescription = "Previous chapter")
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Previous chapter")
                 }
                 val sliderModifier = Modifier.weight(1f).semantics { contentDescription = "Position in chapter" }
                 if (pageMode) {
@@ -1277,7 +1278,7 @@ private fun ReaderBottomBar(
                     Slider(value = progress?.fraction ?: 0f, onValueChange = onSeek, enabled = progress != null, modifier = sliderModifier)
                 }
                 IconButton(onClick = onNext, enabled = hasNext) {
-                    Icon(ReaderIcons.SkipNext, contentDescription = "Next chapter")
+                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Next chapter")
                 }
             }
             Row(Modifier.padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {

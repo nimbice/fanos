@@ -1,10 +1,18 @@
 package io.github.nimbice.fanos.feature.reader
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -13,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
@@ -48,8 +57,10 @@ internal fun shadeOf(slider: Float): Float = if (slider >= DIM) 0f else (DIM - s
 
 /**
  * The brightness slider, [brightness] or for null the device's own, and at its end a button back to the device's own
- * (automatic where the phone has it so), lit while that's the one in use.
+ * (automatic where the phone has it so), lit while that's the one in use. A thick bar with the sun in its lit part, as
+ * the phone's own brightness bar, so it isn't taken for the thin slider through the chapter just under it.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun BrightnessSlider(brightness: Float?, onBrightness: (Float?) -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
@@ -57,11 +68,13 @@ internal fun BrightnessSlider(brightness: Float?, onBrightness: (Float?) -> Unit
     // Read again on going back to the device's own, so the slider shows where the phone has it now.
     val deviceLevel = remember(context, own) { deviceBrightness(context) }
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        Icon(ReaderIcons.BrightnessLow, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
         Slider(
             value = brightness ?: deviceLevel,
             onValueChange = { value -> onBrightness((value * 100).roundToInt() / 100f) },
-            modifier = Modifier.weight(1f).padding(horizontal = 8.dp).semantics { contentDescription = "Brightness" },
+            modifier = Modifier.weight(1f).padding(end = 4.dp).semantics { contentDescription = "Brightness" },
+            // The lit part's end is where it's held.
+            thumb = {},
+            track = { state -> BrightnessTrack(state.value) },
         )
         IconButton(onClick = { onBrightness(null) }, modifier = Modifier.semantics { if (own) stateDescription = "In use" }) {
             Icon(
@@ -73,6 +86,23 @@ internal fun BrightnessSlider(brightness: Float?, onBrightness: (Float?) -> Unit
         }
     }
 }
+
+/** The bar, lit up to [fraction] of the way along; never less lit than its round end with the sun in it. */
+@Composable
+private fun BrightnessTrack(fraction: Float) {
+    val colors = MaterialTheme.colorScheme
+    BoxWithConstraints(Modifier.fillMaxWidth().height(BAR).clip(CircleShape).background(colors.surfaceContainerHighest)) {
+        Box(
+            Modifier.fillMaxHeight().width(BAR + (maxWidth - BAR) * fraction.coerceIn(0f, 1f)).clip(CircleShape).background(colors.primary),
+            contentAlignment = Alignment.CenterEnd,
+        ) {
+            Icon(ReaderIcons.BrightnessLow, contentDescription = null, tint = colors.onPrimary, modifier = Modifier.padding(end = 12.dp).size(20.dp))
+        }
+    }
+}
+
+/** The brightness bar's height, and so the width of its round ends. */
+private val BAR = 44.dp
 
 /**
  * Over the page: a tint for [warmth], amber for warm and blue for cold, and a shade for [brightness] below the screen's

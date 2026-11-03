@@ -24,14 +24,16 @@ import io.github.nimbice.fanos.core.model.ReaderSettings
 import io.github.nimbice.fanos.core.model.ReaderTheme
 
 /**
- * Over the bottom bar while the controls show: the text size, the colours and the brightness, to change in passing.
+ * Over the bottom bar while the controls show: the brightness, the text size and the colours, to change in passing.
  * The rest are in the reading settings.
  */
 @Composable
 internal fun QuickSettings(settings: ReaderSettings, onChange: ((ReaderSettings) -> ReaderSettings) -> Unit, onBrightness: (Float?) -> Unit, modifier: Modifier = Modifier) {
     Surface(modifier = modifier, shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainerLow, shadowElevation = 6.dp) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            // Brightness at the top, the text size and colours between it and the slider through the chapter.
+            BrightnessSlider(settings.brightness, onBrightness, Modifier.fillMaxWidth())
+            Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                 FilledTonalIconButton(onClick = { onChange { it.copy(fontSize = (it.fontSize - 1).coerceAtLeast(MIN_SIZE)) } }, enabled = settings.fontSize > MIN_SIZE) {
                     Text("A−", style = MaterialTheme.typography.labelLarge, modifier = Modifier.semantics { contentDescription = "Smaller text" })
                 }
@@ -46,7 +48,6 @@ internal fun QuickSettings(settings: ReaderSettings, onChange: ((ReaderSettings)
                     }
                 }
             }
-            BrightnessSlider(settings.brightness, onBrightness, Modifier.fillMaxWidth().padding(top = 4.dp))
         }
     }
 }

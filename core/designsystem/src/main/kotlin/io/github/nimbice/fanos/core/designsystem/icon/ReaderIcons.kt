@@ -185,8 +185,8 @@ object ReaderIcons {
         icon("Copy", "M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z")
     }
 
-    /** Auto-scroll: the text moving on by itself. */
-    val AutoScroll: ImageVector by lazy { icon("AutoScroll", "M18 6.41L16.59 5 12 9.58 7.41 5 6 6.41l6 6zm0 6L16.59 11 12 15.58 7.41 11 6 12.41l6 6z") }
+    /** Auto-scroll: the text moving on by itself, set going as a player is. */
+    val AutoScroll: ImageVector by lazy { icon("AutoScroll", "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z") }
 
     val Minus: ImageVector by lazy { icon("Minus", "M19 13H5v-2h14v2z") }
 
