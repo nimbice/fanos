@@ -1,0 +1,3 @@
+• Reader: brightness is now a thick bar with the sun in it, like the phone's own, at the top of the controls, with the text size and colours between it and the slider through the chapter, so the two are hard to mix up.
+• Reader: the chapter buttons beside that slider are plain back and forward arrows, and auto-scroll is a play button.
+• Fixed: in page mode, opening a chapter while the ones before it loaded in could still set the reader asking for chapter after chapter. Now only the chapter…

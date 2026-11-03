@@ -3,6 +3,13 @@
 What changed in each release of Fanos, newest first. The newest is always on the
 [releases page](https://github.com/nimbice/fanos/releases/latest).
 
+## 0.1.8 (2026-11-03)
+
+- Reader: brightness is now a thick bar with the sun in it, like the phone's own, at the top of the controls, with the text size and colours between it and the slider through the chapter, so the two are hard to mix up.
+- Reader: the chapter buttons beside that slider are plain back and forward arrows, and auto-scroll is a play button.
+- Fixed: in page mode, opening a chapter while the ones before it loaded in could still set the reader asking for chapter after chapter. Now only the chapter just before or after the one you're reading is asked for.
+- Library updates check one novel at a time from each site, several sites side by side, so one busy site no longer holds up the rest. Once a site wants a bot check or a sign-in, its other novels are marked the same way without asking it again.
+
 ## 0.1.7 (2026-11-02)
 
 - Fixed: in page mode the reader could load chapter after chapter by itself until it ran out of memory and closed, sometimes seeming to freeze on a page turn first. It now never loads more than two chapters either side of the one you're reading.
