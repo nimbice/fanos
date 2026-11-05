@@ -80,15 +80,17 @@ fun releaseTime(chapters: List<Chapter>, zone: ZoneId): ReleaseTime? {
 fun checkWindows(chapters: List<Chapter>): List<Pair<Long, Long>> =
     chapters.mapNotNull { chapter -> chapter.seenAfter?.let { after -> chapter.addedAt?.let { after to it } } }
 
-/** Where the most of a novel's check windows overlap: from [start] minutes into the day, [minutes] long, past midnight perhaps. */
-data class ReleaseRange(val start: Int, val minutes: Int)
+/**
+ * Where a novel's check windows put the time of day its chapters come out: from [start] minutes into the day, [minutes]
+ * long, past midnight perhaps. [wanders] when they don't share it, the time moving about within it from day to day.
+ */
+data class ReleaseRange(val start: Int, val minutes: Int, val wanders: Boolean = false)
 
 /**
  * The time of day chapters come out, estimated from [windows]: for each, the check that didn't find a chapter and the one
- * that did, so it came out in between. Where the most of the last eight weeks' windows overlap, round the clock (three
- * in four of them at least), is when they usually come out, given as a window once that's within four hours
- * ([estimatedReleaseRange], to the half hour). Null when there are too few windows narrow enough to go by, or they don't
- * agree. Chapters found together count once.
+ * that did, so it came out in between. Where the last eight weeks' windows put it ([estimatedReleaseRange]) is when they
+ * usually come out, given as a window, to the half hour, once that's within four hours. Null when there are too few
+ * windows narrow enough to go by, or they don't agree. Chapters found together count once.
  */
 fun estimatedReleaseTime(windows: Collection<Pair<Long, Long>>, zone: ZoneId): ReleaseTime? {
     val range = estimatedReleaseRange(windows, zone)?.takeIf { it.minutes <= WINDOW_MINUTES } ?: return null
@@ -98,24 +100,30 @@ fun estimatedReleaseTime(windows: Collection<Pair<Long, Long>>, zone: ZoneId): R
 }
 
 /**
- * Where the most of the last eight weeks' check [windows] overlap, three in four of them at least, however wide: what
- * [estimatedReleaseTime] goes by, and where [nextProbe] narrows it down. Null with too few windows, or ones that don't
- * agree.
+ * Where the last eight weeks' check [windows] put the time of day chapters come out, however wide: what
+ * [estimatedReleaseTime] goes by, and where [nextProbe] narrows it down. Where the most of them overlap, three in four
+ * of them at least, when they do: a chapter out at much the same time each day. Else, as a chapter out at a time that
+ * wanders (a site that copies another's, a few hours after), the shortest stretch of the day that holds three in four
+ * of its likely times ([likelyRange]). Null with too few windows, or ones that agree on nothing.
  */
 fun estimatedReleaseRange(windows: Collection<Pair<Long, Long>>, zone: ZoneId): ReleaseRange? {
     val last = windows.maxOfOrNull { it.second } ?: return null
     val usable = windows.distinct().filter { (after, at) -> at > after && at - after <= MAX_CHECK_GAP_MS && at > last - WINDOW_DAYS * DAY_MS }
     if (usable.size < MIN_ESTIMATES) return null
+    return sharedRange(usable, zone) ?: likelyRange(usable, zone)
+}
+
+/** Where the most of [windows] overlap, three in four of them at least, as one run round the clock; else null. */
+private fun sharedRange(windows: List<Pair<Long, Long>>, zone: ZoneId): ReleaseRange? {
     val counts = IntArray(MINUTES_A_DAY)
-    for ((after, at) in usable) {
-        val start = Instant.ofEpochMilli(after).atZone(zone).toLocalTime().let { it.hour * 60 + it.minute }
-        val length = ((at - after) / 60_000).toInt().coerceAtLeast(1)
-        for (m in 0 until length) counts[(start + m) % MINUTES_A_DAY]++
+    for ((after, at) in windows) {
+        val start = minuteOfDay(after, zone)
+        for (m in 0 until windowMinutes(after, at)) counts[(start + m) % MINUTES_A_DAY]++
     }
     // The minutes the most windows share, three in four of them at least, as one run round the clock; two apart, or
     // none, and it can't be told.
     val most = counts.max()
-    if (most < ceil(usable.size * TIME_SHARE).toInt()) return null
+    if (most < ceil(windows.size * TIME_SHARE).toInt()) return null
     val agreed = (0 until MINUTES_A_DAY).map { counts[it] == most }
     if (agreed.none { it } || agreed.all { it }) return null
     val starts = (0 until MINUTES_A_DAY).filter { agreed[it] && !agreed[(it + MINUTES_A_DAY - 1) % MINUTES_A_DAY] }
@@ -125,6 +133,36 @@ fun estimatedReleaseRange(windows: Collection<Pair<Long, Long>>, zone: ZoneId): 
     while (agreed[(from + width) % MINUTES_A_DAY]) width++
     return ReleaseRange(from, width)
 }
+
+/**
+ * The shortest stretch of the day, round the clock, holding three in four of the chapters' likely times, each chapter
+ * as likely out at any minute of its window: windows that don't all share a minute, but crowd one part of the day, still
+ * say when to look. Windows spread wide say little: the stretch comes out as wide as they are. Null when it's the
+ * whole day.
+ */
+private fun likelyRange(windows: List<Pair<Long, Long>>, zone: ZoneId): ReleaseRange? {
+    val likely = DoubleArray(MINUTES_A_DAY)
+    for ((after, at) in windows) {
+        val start = minuteOfDay(after, zone)
+        val length = windowMinutes(after, at)
+        for (m in 0 until length) likely[(start + m) % MINUTES_A_DAY] += 1.0 / length
+    }
+    val need = windows.size * TIME_SHARE - 1e-6
+    var best: ReleaseRange? = null
+    // Each start, and the least run from it that holds enough: that run's end only moves on as the start does.
+    var end = 0
+    var held = 0.0
+    for (start in 0 until MINUTES_A_DAY) {
+        while (held < need && end < start + MINUTES_A_DAY) held += likely[end++ % MINUTES_A_DAY]
+        if (held >= need && (best == null || end - start < best.minutes)) best = ReleaseRange(start, end - start, wanders = true)
+        held -= likely[start]
+    }
+    return best?.takeIf { it.minutes < MINUTES_A_DAY }
+}
+
+private fun minuteOfDay(millis: Long, zone: ZoneId): Int = Instant.ofEpochMilli(millis).atZone(zone).toLocalTime().let { it.hour * 60 + it.minute }
+
+private fun windowMinutes(after: Long, at: Long): Int = ((at - after) / 60_000).toInt().coerceAtLeast(1)
 
 /**
  * The time of day [times] (the site's own) fall at, going by the last eight weeks': about one time when three in four
@@ -391,10 +429,12 @@ fun nextReleaseCheck(
  * When to check a novel, to pin down the time of day its chapters come out, while that isn't known to within
  * [PROBE_UNTIL]: on the next day one is due and isn't out yet, halfway through what's left of [range] (where the checks
  * so far put it; any time of day, with none) after [lastChecked], the last check, which didn't find it. Each check
- * halves what's left: found, the day's window ends there; not, the rest starts there. Past halfway already (the phone
- * was asleep), as soon as may be. Null once what's left is narrow enough, for the release checks and the library
- * updates to take on, and for a novel with no set day; null too when [regularSoon] says a library update is about to
- * look anyway, given the probe's time and the end of what's left.
+ * halves what's left: found, the day's window ends there; not, the rest starts there. A time that [wanders] from day to
+ * day can't be halved down across days, each day's own window has to be narrow: [PROBE_STEP] apart at most through the
+ * range, so the day's window is no wider. Past halfway already (the phone was asleep), as soon as may be. Null once
+ * what's left is narrow enough, for the release checks and the library updates to take on, and for a novel with no set
+ * day; null too when [regularSoon] says a library update is about to look anyway, given the probe's time and the end
+ * of what's left (of the step, for a time that wanders).
  */
 fun nextProbe(
     pattern: ReleasePattern,
@@ -417,8 +457,10 @@ fun nextProbe(
         val from = if (checked != null && checked.isAfter(opens)) checked else opens
         val left = Duration.between(from, closes)
         if (!closes.isAfter(now) || left <= PROBE_UNTIL) continue
-        val at = from.plus(left.dividedBy(2)).let { if (it.isAfter(now)) it else now.plus(PROBE_LATE) }
-        return at.takeUnless { regularSoon(it, closes) }
+        val wanders = range?.wanders == true
+        val step = left.dividedBy(2).let { if (wanders) minOf(it, PROBE_STEP) else it }
+        val at = from.plus(step).let { if (it.isAfter(now)) it else now.plus(PROBE_LATE) }
+        return at.takeUnless { regularSoon(it, if (wanders) minOf(closes, it.plus(PROBE_STEP)) else closes) }
     }
     return null
 }
@@ -531,6 +573,9 @@ val RELEASE_CHECKS: List<Duration> = listOf(1L, 5, 10, 30, 30, 30).map(Duration:
 
 /** Probing ([nextProbe]) stops once the time a novel's chapters come out is known to within this. */
 val PROBE_UNTIL: Duration = Duration.ofMinutes(30)
+
+/** Probes for a time that wanders ([ReleaseRange.wanders]) are this far apart at most. */
+val PROBE_STEP: Duration = Duration.ofMinutes(30)
 
 /** A probe whose time went by unchecked (the phone asleep, the site down) is tried this long after. */
 private val PROBE_LATE: Duration = Duration.ofMinutes(15)
