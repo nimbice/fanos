@@ -32,6 +32,7 @@ import io.github.nimbice.fanos.core.data.release.hoursAway
 import io.github.nimbice.fanos.core.designsystem.component.rememberMinute
 import io.github.nimbice.fanos.core.data.release.windowText
 import io.github.nimbice.fanos.core.data.release.perDayText
+import io.github.nimbice.fanos.core.data.release.missed
 
 /** A library novel in the week's calendar: when its chapters usually come out (the time of day too, when known), and whether today's is out yet. */
 data class CalendarNovel(
@@ -43,6 +44,8 @@ data class CalendarNovel(
     val time: ReleaseTime? = null,
     /** How many chapters come out at once; 1 for one. */
     val perDay: Int = 1,
+    /** When the novel was last checked for new chapters. */
+    val lastChecked: Long? = null,
 )
 
 /**
@@ -117,7 +120,8 @@ private fun CalendarHeading(text: String) {
 
 /**
  * A novel under its day: its cover, title, pattern and time of day; on today's, whether the chapter's out yet. One with no
- * set day says which days its next could come, and that the day it's under is an early guess.
+ * set day says which days its next could come, and that the day it's under is an early guess. Not out, and a check more
+ * than an hour after its time (its window's end) didn't find it: missed, in red.
  */
 @Composable
 private fun CalendarRow(novel: CalendarNovel, day: LocalDate?, today: Boolean, clock: ZonedDateTime, is24Hour: Boolean, onOpenNovel: (Long) -> Unit) {
@@ -161,15 +165,23 @@ private fun CalendarRow(novel: CalendarNovel, day: LocalDate?, today: Boolean, c
             )
         } else if (today) {
             val out = novel.outToday
+            val missed = !out && novel.time?.let { missed(day ?: now, it, novel.lastChecked, clock.zone) } == true
+            val colors = MaterialTheme.colorScheme
+            val (label, color, background) =
+                when {
+                    out -> Triple("Out", colors.onSecondaryContainer, colors.secondaryContainer)
+                    missed -> Triple("Missed", colors.onErrorContainer, colors.errorContainer)
+                    else -> Triple("Not yet", colors.onSurfaceVariant, colors.surfaceContainerHighest)
+                }
             Text(
-                if (out) "Out" else "Not yet",
+                label,
                 style = MaterialTheme.typography.labelMedium,
-                color = if (out) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                color = color,
                 modifier =
                     Modifier
                         .padding(end = 12.dp)
                         .clip(RoundedCornerShape(10.dp))
-                        .background(if (out) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest)
+                        .background(background)
                         .padding(horizontal = 8.dp, vertical = 3.dp),
             )
         }

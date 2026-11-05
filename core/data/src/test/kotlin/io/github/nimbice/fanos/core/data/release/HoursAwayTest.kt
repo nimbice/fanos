@@ -71,4 +71,20 @@ class HoursAwayTest {
         )
         assertEquals("New chapters every day, around 6 PM", releaseText(daily, today, Locale.ENGLISH, time = sixPm))
     }
+
+    @Test
+    fun `missed once a check more than an hour past its time doesn't find it`() {
+        fun checked(hour: Int, minute: Int = 0, day: LocalDate = today) = at(day, hour, minute).toInstant().toEpochMilli()
+        // Due at 6 PM: a check at 7 PM is too soon to say, one at 7:01 PM says it's missed.
+        assertEquals(false, missed(today, sixPm, checked(19), zone))
+        assertEquals(true, missed(today, sixPm, checked(19, 1), zone))
+        // A window goes by its end.
+        assertEquals(false, missed(today, twoToFive, checked(17, 30), zone))
+        assertEquals(true, missed(today, twoToFive, checked(18, 30), zone))
+        // One past midnight ends the next day; never checked, nothing to say.
+        val lateNight = ReleaseTime.Window(LocalTime.of(23, 0), LocalTime.of(1, 0))
+        assertEquals(false, missed(today, lateNight, checked(23, 59), zone))
+        assertEquals(true, missed(today, lateNight, checked(2, 30, today.plusDays(1)), zone))
+        assertEquals(false, missed(today, sixPm, null, zone))
+    }
 }

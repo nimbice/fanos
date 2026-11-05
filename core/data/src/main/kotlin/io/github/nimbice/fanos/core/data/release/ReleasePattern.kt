@@ -347,6 +347,15 @@ fun hoursAway(day: LocalDate, time: ReleaseTime, now: ZonedDateTime): String? {
 }
 
 /** When [day]'s chapter comes out at [time]: from and to, the same moment for one time; a window past midnight ends the next day. */
+/**
+ * Whether [day]'s chapter, out at [time], looks missed: a check at [lastChecked] (that didn't find it, as it isn't out)
+ * came more than [MISSED_AFTER] after it was due by, its time or its window's end.
+ */
+fun missed(day: LocalDate, time: ReleaseTime, lastChecked: Long?, zone: ZoneId, after: Duration = MISSED_AFTER): Boolean {
+    val checked = lastChecked ?: return false
+    return checked > expectedAt(day, time, zone).second.plus(after).toInstant().toEpochMilli()
+}
+
 private fun expectedAt(day: LocalDate, time: ReleaseTime, zone: ZoneId): Pair<ZonedDateTime, ZonedDateTime> =
     when (time) {
         is ReleaseTime.At -> day.atTime(time.time).atZone(zone).let { it to it }
@@ -573,6 +582,9 @@ val RELEASE_CHECKS: List<Duration> = listOf(1L, 5, 10, 30, 30, 30).map(Duration:
 
 /** Probing ([nextProbe]) stops once the time a novel's chapters come out is known to within this. */
 val PROBE_UNTIL: Duration = Duration.ofMinutes(30)
+
+/** A chapter not found by a check this long after it was due by is missed ([missed]). */
+val MISSED_AFTER: Duration = Duration.ofHours(1)
 
 /** Probes for a time that wanders ([ReleaseRange.wanders]) are this far apart at most. */
 val PROBE_STEP: Duration = Duration.ofMinutes(30)

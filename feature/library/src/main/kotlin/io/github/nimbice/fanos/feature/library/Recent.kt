@@ -135,7 +135,7 @@ class RecentViewModel @Inject constructor(
                 recent.releaseDays(ZoneId.systemDefault())
                     .mapNotNull { novel ->
                         releasePattern(novel.days, today)?.let {
-                            CalendarNovel(novel.novelId, novel.title, novel.coverUrl, it, today in novel.days, novel.time, chaptersPerDay(novel.days))
+                            CalendarNovel(novel.novelId, novel.title, novel.coverUrl, it, today in novel.days, novel.time, chaptersPerDay(novel.days), novel.lastChecked)
                         }
                     }
                     .sortedBy { it.title.lowercase() }
