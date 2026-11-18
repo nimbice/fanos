@@ -1,0 +1,2 @@
+• New chapters: for a novel whose chapters come out at a slightly different time each day, Fanos now checks every half hour around when they usually appear, so it settles on a likely time and finds new chapters sooner. Before, such a novel could go weeks without one.
+• This week: when a check an hour past a novel's usual time still hasn't found today's chapter, its tag turns red and says Missed instead of Not yet.

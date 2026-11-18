@@ -3,6 +3,11 @@
 What changed in each release of Fanos, newest first. The newest is always on the
 [releases page](https://github.com/nimbice/fanos/releases/latest).
 
+## 0.1.9 (2026-11-17)
+
+- New chapters: for a novel whose chapters come out at a slightly different time each day, Fanos now checks every half hour around when they usually appear, so it settles on a likely time and finds new chapters sooner. Before, such a novel could go weeks without one.
+- This week: when a check an hour past a novel's usual time still hasn't found today's chapter, its tag turns red and says Missed instead of Not yet.
+
 ## 0.1.8 (2026-11-03)
 
 - Reader: brightness is now a thick bar with the sun in it, like the phone's own, at the top of the controls, with the text size and colours between it and the slider through the chapter, so the two are hard to mix up.
